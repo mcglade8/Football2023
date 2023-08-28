@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>NFL Projections</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/jquery-1.11.1.min.js"></script>
+    <script src="js/jquery-ui.min.js"></script>
+    <script src="js/jquery.tablesorter.min.js"></script>
+    <script src="js/jquery.tablesorter.widgets.min.js"></script>
+    <script src="js/jquery.tablesorter.pager.min.js"></script>
+    <script src="js/jquery.tablesorter.pager.min.js"></script>
+    <script src="js/jquery.tablesorted.widgets-filter-formatter.min.js"></script>
+    <body>
+        <div id="wrapper">
+            <div id="header">
+                <h1>NFL Projections</h1>
+            </div>
+            <div id="content">
+                <div id="table">
+                    <table id="myTable" class="tablesorter">
+                        <thead>
+                            <tr>
+                                <!-- get headers based on DKSalariesNFL.csv -->
+                                <th>Position</th>
+                                <th>Name</th>
+                                <th>Team</th>
+                                <th>Opponent</th>
+                                <th>Salary</th>
+
+                            </tr>
+                        </thead>
+                        <tbody>
+                            
+                            
+
+                            
+
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="footer">
+            </div>
+        </div>
+        <script>
+           // Fill rows of myTable based on DKSalariesNFL.csv
+            $(document).ready(function() {
+                $.ajax({
+                    type: "GET",
+                    url: "DKSalariesNFL.csv",
+                    dataType: "text",
+                    success: function(data) {
+                        var lines = data.split(/\r\n|\n/);
+                        var table = $('#myTable tbody');
+                        for (var i = 1; i < lines.length; i++) {
+                            var row = $('<tr></tr>');
+                            var cells = lines[i].split(',');
+                            for (var j = 0; j < cells.length; j++) {
+                                var cell = $('<td></td>');
+                                cell.html(cells[j]);
+                                row.append(cell);
+                            }
+                            table.append(row);
+                        }
+                    }
+                });
+            });
+
+            $(document).ready(function() {
+                $("#myTable").tablesorter({
+                    theme: 'blue',
+                    widgets: ['zebra', 'filter'],
+                    widgetOptions: {
+                        filter_columnFilters: false,
+                        filter_saveFilters: true,
+                        filter_reset: '.reset'
+                    }
+                });
+            });
+        </script>
+    </body>
+</html>
