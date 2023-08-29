@@ -4,13 +4,7 @@
     <meta charset="utf-8">
     <title>NFL Projections</title>
     <link rel="stylesheet" href="css/style.css">
-    <script src="js/jquery-1.11.1.min.js"></script>
-    <script src="js/jquery-ui.min.js"></script>
-    <script src="js/jquery.tablesorter.min.js"></script>
-    <script src="js/jquery.tablesorter.widgets.min.js"></script>
-    <script src="js/jquery.tablesorter.pager.min.js"></script>
-    <script src="js/jquery.tablesorter.pager.min.js"></script>
-    <script src="js/jquery.tablesorted.widgets-filter-formatter.min.js"></script>
+    <script src="jquery-3.7.1.min.js"></script>
     <body>
         <div id="wrapper">
             <div id="header">
@@ -21,12 +15,7 @@
                     <table id="myTable" class="tablesorter">
                         <thead>
                             <tr>
-                                <!-- get headers based on DKSalariesNFL.csv -->
-                                <th>Position</th>
-                                <th>Name</th>
-                                <th>Team</th>
-                                <th>Opponent</th>
-                                <th>Salary</th>
+                            
 
                             </tr>
                         </thead>
@@ -44,40 +33,145 @@
             </div>
         </div>
         <script>
-           // Fill rows of myTable based on DKSalariesNFL.csv
-            $(document).ready(function() {
-                $.ajax({
-                    type: "GET",
-                    url: "DKSalariesNFL.csv",
-                    dataType: "text",
-                    success: function(data) {
-                        var lines = data.split(/\r\n|\n/);
-                        var table = $('#myTable tbody');
-                        for (var i = 1; i < lines.length; i++) {
-                            var row = $('<tr></tr>');
-                            var cells = lines[i].split(',');
-                            for (var j = 0; j < cells.length; j++) {
-                                var cell = $('<td></td>');
-                                cell.html(cells[j]);
-                                row.append(cell);
-                            }
-                            table.append(row);
-                        }
-                    }
-                });
+           // Scrape contest data from Draftkings.com for upcoming NFL contests
+            var corsAPI = "https://cors-anywhere.herokuapp.com/";
+            var url = "https://www.draftkings.com/lobby/getcontests?sport=NFL";
+            var data = $.get(corsAPI+url, function() {
+                console.log("success");
             });
+            var contests = data.responseJSON.Contests;
+            var contestData = [];
+            // Get one contest for each start time in the upcoming contests
+            for (var i = 0; i < contests.length; i++) {
+                var contest = contests[i];
+                // Get the contest start time
+                var startTime = contest['DraftGroups'][0]['ContestStartTime'];
+                // If start time is already in contestData, skip it. Otherwise add to contestData
+                if (contestData.some(e => e['startTime'] === startTime)) {
+                    continue;
+                }
+                else {
+                    contestData.push(contest);
+                }
+            }
+            // Get a player pool for a contest in each start time in contestData
+            var playerPoolData = [];
+            for (var i = 0; i < contestData.length; i++) {
+                var contest = contestData[i];
+                var contestID = contest['DraftGroups'][0]['DraftGroupId'];
+                var url = "https://www.draftkings.com/lobby/getcontests?sport=NFL&contestId=" + contestID;
+                var data = $.get(corsAPI+url, function() {
+                    console.log("success");
+                });
+                var playerPool = data.responseJSON.Contests[0]['DraftGroups'][0]['PlayerPoolEntries'];
+                playerPoolData.push(playerPool);
+            }
+            // Get player data for each player in each player pool in playerPoolData
+            var playerData = [];
+            for (var i = 0; i < playerPoolData.length; i++) {
+                var playerPool = playerPoolData[i];
+                for (var j = 0; j < playerPool.length; j++) {
+                    var player = playerPool[j];
+                    var playerID = player['PlayerId'];
+                    var url = "https://www.draftkings.com/lineup/getavailableplayers?contestTypeId=70&draftGroupId=0&gameTypeId=1&sport=NFL";
+                    var data = $.get(corsAPI+url, function() {
+                        console.log("success");
+                    });
+                    var players = data.responseJSON;
+                    var player = players.find(x => x['Id'] === playerID);
+                    playerData.push(player);
+                }
+            }
 
-            $(document).ready(function() {
-                $("#myTable").tablesorter({
-                    theme: 'blue',
-                    widgets: ['zebra', 'filter'],
-                    widgetOptions: {
-                        filter_columnFilters: false,
-                        filter_saveFilters: true,
-                        filter_reset: '.reset'
+            // Add a select so user can choose which contest start time to display in a table
+            var select = document.createElement("select");
+            select.id = "select";
+            select.name = "select";
+            select.onchange = function() {
+                var table = document.getElementById("myTable");
+                var rows = table.rows;
+                for (var i = 1; i < rows.length; i++) {
+                    var row = rows[i];
+                    var cells = row.cells;
+                    var cell = cells[0];
+                    var cellText = cell.innerHTML;
+                    var select = document.getElementById("select");
+                    var selected = select.options[select.selectedIndex].text;
+                    if (cellText === selected) {
+                        row.style.display = "";
                     }
-                });
-            });
+                    else {
+                        row.style.display = "none";
+                    }
+                }
+            }
+
+            // Populate myTable with player information based on the default select option
+            var table = document.getElementById("myTable");
+            var row = table.insertRow(0);
+            var cell = row.insertCell(0);
+            cell.innerHTML = "Contest Start Time";
+            var cell = row.insertCell(1);
+            cell.innerHTML = "Player Name";
+            var cell = row.insertCell(2);
+            cell.innerHTML = "Position";
+            var cell = row.insertCell(3);
+            cell.innerHTML = "Team";
+            var cell = row.insertCell(4);
+            cell.innerHTML = "Opponent";
+            var cell = row.insertCell(5);
+            cell.innerHTML = "Salary";
+            var cell = row.insertCell(6);
+            cell.innerHTML = "Projected Points";
+            var cell = row.insertCell(7);
+            cell.innerHTML = "Projected Value";
+            var cell = row.insertCell(8);
+            cell.innerHTML = "Projected Ownership";
+            var cell = row.insertCell(9);
+            // Insert rows of players based on selected contest start time
+            for (var i = 0; i < playerData.length; i++) {
+                var player = playerData[i];
+                var row = table.insertRow(i+1);
+                var cell = row.insertCell(0);
+                var startTime = contestData[i]['DraftGroups'][0]['ContestStartTime'];
+                cell.innerHTML = startTime;
+                var cell = row.insertCell(1);
+                var playerName = player['Name'];
+                cell.innerHTML = playerName;
+                var cell = row.insertCell(2);
+                var position = player['Position'];
+                cell.innerHTML = position;
+                var cell = row.insertCell(3);
+                var team = player['TeamAbbrev'];
+                cell.innerHTML = team;
+                var cell = row.insertCell(4);
+                var opponent = player['OpponentAbbrev'];
+                cell.innerHTML = opponent;
+                var cell = row.insertCell(5);
+                var salary = player['Salary'];
+                cell.innerHTML = salary;
+                var cell = row.insertCell(6);
+                var projectedPoints = player['ProjectedPoints'];
+                cell.innerHTML = projectedPoints;
+                var cell = row.insertCell(7);
+                var projectedValue = player['ProjectedValue'];
+                cell.innerHTML = projectedValue;
+                var cell = row.insertCell(8);
+                var projectedOwnership = player['ProjectedOwnership'];
+                cell.innerHTML = projectedOwnership;
+                var cell = row.insertCell(9);
+                var checkbox = document.createElement("input");
+                checkbox.type = "checkbox";
+                checkbox.name = "checkbox";
+                checkbox.value = "checkbox";
+                cell.appendChild(checkbox);
+            }
+         
+            
+
+            
+            
+
         </script>
     </body>
 </html>
