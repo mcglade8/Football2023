@@ -3,81 +3,158 @@
 <head>
     <meta charset="utf-8">
     <title>NFL Projections</title>
-    <link rel="stylesheet" href="css/style.css">
-    <script src="js/jquery-1.11.1.min.js"></script>
-    <script src="js/jquery-ui.min.js"></script>
-    <script src="js/jquery.tablesorter.min.js"></script>
-    <script src="js/jquery.tablesorter.widgets.min.js"></script>
-    <script src="js/jquery.tablesorter.pager.min.js"></script>
-    <script src="js/jquery.tablesorter.pager.min.js"></script>
-    <script src="js/jquery.tablesorted.widgets-filter-formatter.min.js"></script>
-    <body>
-        <div id="wrapper">
-            <div id="header">
-                <h1>NFL Projections</h1>
-            </div>
-            <div id="content">
-                <div id="table">
-                    <table id="myTable" class="tablesorter">
-                        <thead>
-                            <tr>
-                                <!-- get headers based on DKSalariesNFL.csv -->
-                                <th>Position</th>
-                                <th>Name</th>
-                                <th>Team</th>
-                                <th>Opponent</th>
-                                <th>Salary</th>
+    <link rel="stylesheet" href="style.css">
+    <script src="jquery-3.7.1.min.js"></script>
+    <script src="jquery.tablesorter.min.js"></script>
 
-                            </tr>
+</head>
+<body>
+    <div id="wrapper">
+        <div id="header">
+            <h1>NFL Projections</h1>
+        </div>
+        <div id="tabs">          
+            <button id="contestInfo" class="tabButton">Contest Info</button>
+            <button id="defensesInfo" class="tabButton">Defense Info</button>
+        </div>
+        <div id="contest" class="contestDiv tabContent" style="display:block;width:100%">
+            <div id="mainTableSection">
+                <div id="tableController">
+                    <table>
+                        <td><button id="getPlayerData" onclick="getContestData()">Get Contest Data</button></td>
+                        <td><button id="saveTableData" onclick="saveTableData()">Save Table Data</button></td>
+                        <td><button id="loadTableData" onclick="loadTableData()">Load Table Data</button></td>
+                        <td><select id="select"><option value="default">Select Contest Start Time</option></select></td>
+                    </table>
+                </div>
+                <div id="table">
+                    <table id="contestDataTable" class="tablesorter">
+                        <thead>
+                            <th>Image</th>
+                            <th>Name</th>
+                            <th>Position</th>
+                            <th>Team</th>
+                            <th>Opponent</th>
+                            <th>Salary</th>
+                            <th>ID</th>
+                            <th>PPG</th>
+                            <th>Slate Time</th>
+                            <th>Projection</th>
                         </thead>
                         <tbody>
                             
-                            
-
-                            
-
                         </tbody>
                     </table>
                 </div>
             </div>
-            <div id="footer">
+            
+            <div id="playerAboutSection" style="text-align:center">
+                <h2>Player Data</h2>
+                <div id="playerInfo">
+                    <table style="width:100%" id="playerSummary">
+                        <tr>
+                            <td>Name:</td>
+                            <td id="playerName"></td>
+                        </tr>
+                        <tr>
+                            <td>Position:</td>
+                            <td id="playerPosition"></td>
+                        </tr>
+                        <tr>
+                            <td>Team:</td>
+                            <td id="playerTeam"></td>
+                        </tr>
+                        <tr>
+                            <td>Opponent:</td>
+                            <td id="playerOpponent"></td>
+                        </tr>
+                        <tr>
+                            <td>Salary:</td>
+                            <td id="playerSalary"></td>
+                        </tr>
+                        <tr>
+                            <td>ID:</td>
+                            <td id="playerID"></td>
+                        </tr>
+                        <tr>
+                            <td>PPG:</td>
+                            <td id="playerPPG"></td>
+                        </tr>
+                        <tr>
+                            <td>Slate Time:</td>
+                            <td id="playerSlateTime"></td>
+                        </tr>
+                        <tr>
+                            <td>Projection:</td>
+                            <td id="playerProjection"></td>
+                        </tr>
+                    </table>
+                    <div>
+                        <table id="updateProjections" style="width:100%">
+                            <tr>
+                                <td>Passing Yards:</td>
+                                <td><input type="number" id="passingYards" value="0"></td>
+                            </tr>
+                            <tr>
+                                <td>Passing TDs:</td>
+                                <td><input type="number" id="passingTDs" value="0"></td>
+                            </tr>
+                            <tr>
+                                <td>Interceptions:</td>
+                                <td><input type="number" id="interceptions" value="0"></td>
+                            </tr>
+                            <tr>
+                                <td>Receptions:</td>
+                                <td><input type="number" id="receptions" value="0"></td>
+                            </tr>
+                            <tr>
+                                <td>Receiving Yards:</td>
+                                <td><input type="number" id="receivingYards" value="0"></td>
+                            </tr>
+                            <tr>
+                                <td>Receiving TDs:</td>
+                                <td><input type="number" id="receivingTDs" value="0"></td>
+                            </tr>
+                            <tr>
+                                <td>Rushing Yards:</td>
+                                <td><input type="number" id="rushingYards" value="0"></td>
+                            </tr>
+                            <tr>
+                                <td>Rushing TDs:</td>
+                                <td><input type="number" id="rushingTDs" value="0"></td>
+                            </tr>
+                            <tr>
+                                <td><button id="newProjection" onclick="newProjection()">Replace Projection</button></td>
+                                <td>New projection = <text id="calcProj">0</text></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
-        <script>
-           // Fill rows of myTable based on DKSalariesNFL.csv
-            $(document).ready(function() {
-                $.ajax({
-                    type: "GET",
-                    url: "DKSalariesNFL.csv",
-                    dataType: "text",
-                    success: function(data) {
-                        var lines = data.split(/\r\n|\n/);
-                        var table = $('#myTable tbody');
-                        for (var i = 1; i < lines.length; i++) {
-                            var row = $('<tr></tr>');
-                            var cells = lines[i].split(',');
-                            for (var j = 0; j < cells.length; j++) {
-                                var cell = $('<td></td>');
-                                cell.html(cells[j]);
-                                row.append(cell);
-                            }
-                            table.append(row);
-                        }
-                    }
-                });
-            });
-
-            $(document).ready(function() {
-                $("#myTable").tablesorter({
-                    theme: 'blue',
-                    widgets: ['zebra', 'filter'],
-                    widgetOptions: {
-                        filter_columnFilters: false,
-                        filter_saveFilters: true,
-                        filter_reset: '.reset'
-                    }
-                });
-            });
-        </script>
-    </body>
+        <div id="defenses" class="tabContent" style="display:none">
+            <h2>Defense Data</h2>
+            <h4>Stats are normalized against mean and standard deviations of projections across league</h4>
+            <button onclick="getDefenseProjections()">Update Defense Data</button>
+            
+            <table id="defensesTable" class="tablesorter">
+                <thead>
+                    <th>Team</th>
+                    <th>Sacks</th>
+                    <th>Interceptions</th>
+                    <th>Fumbles Recovered</th>
+                    <th>Defensive TDs</th>
+                    <th>Points Allowed</th>
+                    <th>Yards Allowed</th>
+                </thead>
+                <tbody>
+                    
+                </tbody>
+            </table>   
+        </div>
+        <div id="footer">
+        </div>
+    </div>
+    <script type="text/javascript" src="nflscript.js"></script>
+</body>
 </html>
