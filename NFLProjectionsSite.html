@@ -5,182 +5,156 @@
     <title>NFL Projections</title>
     <link rel="stylesheet" href="style.css">
     <script src="jquery-3.7.1.min.js"></script>
-    <body>
-        <div id="wrapper">
-            <div id="header">
-                <h1>NFL Projections</h1>
-            </div>
-            <div>
-                <select id="select">
-                    <option value="default">Select Contest Start Time</option>
-                </select>
-            </div>
-            <div id="content">
+    <script src="jquery.tablesorter.min.js"></script>
+
+</head>
+<body>
+    <div id="wrapper">
+        <div id="header">
+            <h1>NFL Projections</h1>
+        </div>
+        <div id="tabs">          
+            <button id="contestInfo" class="tabButton">Contest Info</button>
+            <button id="defensesInfo" class="tabButton">Defense Info</button>
+        </div>
+        <div id="contest" class="contestDiv tabContent" style="display:block;width:100%">
+            <div id="mainTableSection">
+                <div id="tableController">
+                    <table>
+                        <td><button id="getPlayerData" onclick="getContestData()">Get Contest Data</button></td>
+                        <td><button id="saveTableData" onclick="saveTableData()">Save Table Data</button></td>
+                        <td><button id="loadTableData" onclick="loadTableData()">Load Table Data</button></td>
+                        <td><select id="select"><option value="default">Select Contest Start Time</option></select></td>
+                    </table>
+                </div>
                 <div id="table">
-                    <table id="myTable" class="tablesorter">
-                        
+                    <table id="contestDataTable" class="tablesorter">
+                        <thead>
+                            <th>Image</th>
+                            <th>Name</th>
+                            <th>Position</th>
+                            <th>Team</th>
+                            <th>Opponent</th>
+                            <th>Salary</th>
+                            <th>ID</th>
+                            <th>PPG</th>
+                            <th>Slate Time</th>
+                            <th>Projection</th>
+                        </thead>
+                        <tbody>
+                            
+                        </tbody>
                     </table>
                 </div>
             </div>
-            <div id="footer">
+            
+            <div id="playerAboutSection" style="text-align:center">
+                <h2>Player Data</h2>
+                <div id="playerInfo">
+                    <table style="width:100%" id="playerSummary">
+                        <tr>
+                            <td>Name:</td>
+                            <td id="playerName"></td>
+                        </tr>
+                        <tr>
+                            <td>Position:</td>
+                            <td id="playerPosition"></td>
+                        </tr>
+                        <tr>
+                            <td>Team:</td>
+                            <td id="playerTeam"></td>
+                        </tr>
+                        <tr>
+                            <td>Opponent:</td>
+                            <td id="playerOpponent"></td>
+                        </tr>
+                        <tr>
+                            <td>Salary:</td>
+                            <td id="playerSalary"></td>
+                        </tr>
+                        <tr>
+                            <td>ID:</td>
+                            <td id="playerID"></td>
+                        </tr>
+                        <tr>
+                            <td>PPG:</td>
+                            <td id="playerPPG"></td>
+                        </tr>
+                        <tr>
+                            <td>Slate Time:</td>
+                            <td id="playerSlateTime"></td>
+                        </tr>
+                        <tr>
+                            <td>Projection:</td>
+                            <td id="playerProjection"></td>
+                        </tr>
+                    </table>
+                    <div>
+                        <table id="updateProjections" style="width:100%">
+                            <tr>
+                                <td>Passing Yards:</td>
+                                <td><input type="number" id="passingYards" value="0"></td>
+                            </tr>
+                            <tr>
+                                <td>Passing TDs:</td>
+                                <td><input type="number" id="passingTDs" value="0"></td>
+                            </tr>
+                            <tr>
+                                <td>Interceptions:</td>
+                                <td><input type="number" id="interceptions" value="0"></td>
+                            </tr>
+                            <tr>
+                                <td>Receptions:</td>
+                                <td><input type="number" id="receptions" value="0"></td>
+                            </tr>
+                            <tr>
+                                <td>Receiving Yards:</td>
+                                <td><input type="number" id="receivingYards" value="0"></td>
+                            </tr>
+                            <tr>
+                                <td>Receiving TDs:</td>
+                                <td><input type="number" id="receivingTDs" value="0"></td>
+                            </tr>
+                            <tr>
+                                <td>Rushing Yards:</td>
+                                <td><input type="number" id="rushingYards" value="0"></td>
+                            </tr>
+                            <tr>
+                                <td>Rushing TDs:</td>
+                                <td><input type="number" id="rushingTDs" value="0"></td>
+                            </tr>
+                            <tr>
+                                <td><button id="newProjection" onclick="newProjection()">Replace Projection</button></td>
+                                <td>New projection = <text id="calcProj">0</text></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
-        <script>
-           // Scrape contest data from Draftkings.com for upcoming NFL contests
-            var corsAPI = "https://cors-anywhere.herokuapp.com/";
-            var url = "https://www.draftkings.com/lobby/getcontests?sport=NFL";
-            var select = document.getElementById('select');
-            var table = document.getElementById("myTable");
-
-            async function getContestData(){
-                var contestData = [];
-                // Get an array of Contests from data that we can iterate thru to get contest start times
+        <div id="defenses" class="tabContent" style="display:none">
+            <h2>Defense Data</h2>
+            <h4>Stats are normalized against mean and standard deviations of projections across league</h4>
+            <button onclick="getDefenseProjections()">Update Defense Data</button>
+            
+            <table id="defensesTable" class="tablesorter">
+                <thead>
+                    <th>Team</th>
+                    <th>Sacks</th>
+                    <th>Interceptions</th>
+                    <th>Fumbles Recovered</th>
+                    <th>Defensive TDs</th>
+                    <th>Points Allowed</th>
+                    <th>Yards Allowed</th>
+                </thead>
+                <tbody>
                     
-                    let myPromise = new Promise(function(resolve) {
-                        let req = new XMLHttpRequest();
-                        req.open('GET', corsAPI+url);
-                        req.onload = function() {
-                            if (req.status == 200) {
-                                resolve(req.response);
-                            }
-                            else {
-                                reject(Error(req.statusText));
-                            }
-                        };
-                        req.send();
-                    });
-                    data = await myPromise;
-                    contestData = JSON.parse(data).Contests; 
-                    addSelectOption(contestData);
-                    getPlayerData(contestData);
-            }
-         
-            function addSelectOption(contestData){
-                // Add a select so user can choose which contest start time to display in a table
-                var select = document.getElementById('select');
-                var startTimes = [];
-
-                for (var i = 0; i < contestData.length; i++) {
-                        var startTime = contestData[i]['sdstring'];
-                        // If start time is already in contestData, skip it. Otherwise add to startTimes
-                        if (!startTimes.includes(startTime)) {
-                            startTimes.push(startTime);
-                            var option = document.createElement("option");
-                            option.text = startTime;
-                            select.add(option);
-                        }
-                }      
-            }
-
-            // Get player data for the contest start time selected by the user
-            async function getPlayerData(contestData){
-                for(let o of select.options){
-                    if(o.value != "default"){
-                        let selectedStartTime = o.innerHTML;
-                        
-                        let i = 0;
-                        while(contestData[i]['sdstring'] != selectedStartTime){
-                            i++;
-                        }                        
-                        console.log(contestData[i]);
-                        var selectedID = contestData[i]['dg'];
-                        // get contest data from draftkings based on selectedID
-                        var newurl = "https://www.draftkings.com/lineup/getavailableplayers?contestTypeId=70&draftGroupId="+selectedID+"&gameTypeId=1&sport=NFL";
-                        let myPromise = new Promise(function(resolve) {
-                            let req = new XMLHttpRequest();
-                            req.open('GET', corsAPI+newurl);
-                            req.onload = function() {
-                                if (req.status == 200) {
-                                    resolve(req.response);
-                                }
-                                else {
-                                    reject(Error(req.statusText));
-                                }
-                            };
-                            req.send();
-                        });
-                        data = await myPromise;
-                        var playerData = JSON.parse(data);
-                        console.log(playerData);
-                        
-                        addTableRows(playerData, selectedStartTime);
-                        //addTableFooter(playerData);
-                        //$("#myTable").tablesorter();
-                    }
-                }
-            }
-       
-            getContestData();
-            
-            function addTableHeaders(){
-                // Add table headers
-
-                var table = document.getElementById("myTable");
-                var header = table.createTHead();
-                var row = header.insertRow(0);
-                
-                row.insertCell(0).innerHTML = "Image";
-                row.insertCell(1).innerHTML = "Name";
-                row.insertCell(2).innerHTML = "Position";
-                row.insertCell(3).innerHTML = "Team";
-                row.insertCell(4).innerHTML = "Opponent";
-                row.insertCell(5).innerHTML = "Salary";
-                row.insertCell(6).innerHTML = "ID";
-                row.insertCell(7).innerHTML = "PPG";
-                row.insertCell(8).innerHTML = "Start Time";
-                
-            }
-
-            function addTableRows(playerData, selectedStartTime){
-                var table = document.getElementById("myTable");
-                
-                for(let p of playerData['playerList']){
-                    var row = table.insertRow(-1);
-                    var cell = row.insertCell(0);
-                    var img = document.createElement('img');
-                    img.src = p['imgSm'];
-                    cell.appendChild(img);
-                    row.insertCell(1).innerHTML = p['fn'] + " " + p['ln'];
-                    row.insertCell(2).innerHTML = p['pn'];
-                    if(p['htid'] == p['tid']){
-                        row.insertCell(3).innerHTML = p['htabbr'];
-                    }else{
-                        row.insertCell(3).innerHTML = p['atabbr'];
-                    }
-                    if(p['htid'] == p['tid']){
-                        row.insertCell(4).innerHTML = p['atabbr'];
-                    }else{
-                        row.insertCell(4).innerHTML = p['htabbr'];
-                    }
-                    
-                    row.insertCell(5).innerHTML = p['s'];
-                    row.insertCell(6).innerHTML = p['pid'];
-                    row.insertCell(7).innerHTML = p['ppg'];
-                    row.insertCell(8).innerHTML = selectedStartTime;
-                }
-                
-            }
-            
-            addTableHeaders();
-            
-            select.addEventListener('change', function(){
-                // hide rows that are not for the selected contest start time
-                var selectedStartTime = select.options[select.selectedIndex].innerHTML;
-                var table = document.getElementById("myTable");
-                var rows = table.rows;
-                for (var i = 1; i < rows.length; i++) {
-                    var row = rows[i];
-                    var startTime = row.cells[8].innerHTML;
-                    if(startTime != selectedStartTime){
-                        row.style.display = "none";
-                    }else{
-                        row.style.display = "";
-                    }
-                }
-            })
-            
-            
-
-        </script>
-    </body>
+                </tbody>
+            </table>   
+        </div>
+        <div id="footer">
+        </div>
+    </div>
+    <script type="text/javascript" src="nflscript.js"></script>
+</body>
 </html>
