@@ -18,13 +18,21 @@
             <button id="defensesInfo" class="tabButton">Defense Info</button>
         </div>
         <div id="contest" class="contestDiv tabContent" style="display:block;width:100%">
-            <div id="mainTableSection">
+            <div id="mainTableSection" class="splitScreen">
                 <div id="tableController">
                     <table>
-                        <td><button id="getPlayerData" onclick="getContestData()">Get Contest Data</button></td>
+                        <td><button id="getPlayerData" onclick="getContestData()">Scrape Contest Data</button></td>
                         <td><button id="saveTableData" onclick="saveTableData()">Save Table Data</button></td>
                         <td><button id="loadTableData" onclick="loadTableData()">Load Table Data</button></td>
                         <td><select id="select"><option value="default">Select Contest Start Time</option></select></td>
+                        <td><select id="positionSelect" onchange="getPositionProjections()">
+                            <option value="default">Select Position</option>
+                            <option value="QB">QB</option>
+                            <option value="RB">RB</option>
+                            <option value="WR">WR</option>
+                            <option value="TE">TE</option>
+                            <option value="DST">DST</option>
+                        </select></td>
                     </table>
                 </div>
                 <div id="table">
@@ -48,7 +56,7 @@
                 </div>
             </div>
             
-            <div id="playerAboutSection" style="text-align:center">
+            <div id="playerAboutSection" style="text-align:center" class="splitScreen">
                 <h2>Player Data</h2>
                 <div id="playerInfo">
                     <table style="width:100%" id="playerSummary">
@@ -135,7 +143,7 @@
         <div id="defenses" class="tabContent" style="display:none">
             <h2>Defense Data</h2>
             <h4>Stats are normalized against mean and standard deviations of projections across league</h4>
-            <button onclick="getDefenseProjections()">Update Defense Data</button>
+            <button onclick="getDefenseProjections()">Scrape Defense Data</button>
             
             <table id="defensesTable" class="tablesorter">
                 <thead>
@@ -152,6 +160,7 @@
                 </tbody>
             </table>   
         </div>
+
         <div id="footer">
         </div>
     </div>

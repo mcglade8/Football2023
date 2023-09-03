@@ -3,7 +3,7 @@ var corsAPI = "https://cors-anywhere.herokuapp.com/";
 var url = "https://www.draftkings.com/lobby/getcontests?sport=NFL";
 var select = document.getElementById('select');
 var table = document.getElementById("contestDataTable");
-
+console.log("If requests fail, may need to go to https://cors-anywhere.herokuapp.com/corsdemo to re-authorize");
 async function getContestData(){
     var contestData = [];
     // Get an array of Contests from data that we can iterate thru to get contest start times
@@ -158,6 +158,7 @@ function loadTableData(){
         var row = table.insertRow(-1);
         for (var j = 0; j < tableData[i].length; j++) {
             row.insertCell(j).innerHTML = tableData[i][j];
+            
         }
     }
     // Add select options for each contest start time in the table
@@ -226,7 +227,7 @@ function fillPlayerData(){
                     yardsEffect += r.cells[6].innerHTML;
                 }
             }
-            playerSummary.rows[3].cells[1].innerHTML += "<br>scoringEffect: " + scoringEffect + "<br>yardsEffect: " + yardsEffect;
+            playerSummary.rows[3].cells[1].innerHTML += "<br>Scoring Allowed Compared to Average: " + Number(scoringEffect).toFixed(2) + "<br>Yards Allowed Compared to Average: " + Number(yardsEffect).toFixed(2);
 
                 // Highlight row that was clicked
             var rows = table.rows;
@@ -260,7 +261,7 @@ function updateProjections(){
     var receivingTDs = document.getElementById("receivingTDs").value;
 
     var proj = (passingYards * 0.04) + (passingTDs * 4) + (interceptions * -1) + (rushingYards * 0.1) + (rushingTDs * 6) + (receptions * 1) + (receivingYards * 0.1) + (receivingTDs * 6);
-    calcProj.innerHTML = proj;
+    calcProj.innerHTML = proj.toFixed(2);
 }
 
 // Reset inputs to 0 when another row is clicked
@@ -468,3 +469,47 @@ function teamAbbr(team){
             return "WAS";
     }
 }
+
+function getPositionProjections(){
+    var position = document.getElementById("positionSelect").value;
+    var contestDataTable = document.getElementById("contestDataTable");
+    var contestTime = document.getElementById("select").value;
+
+    for( let r of contestDataTable.rows){
+        if(r.cells[2].innerHTML == position && r.cells[8].innerHTML == contestTime){
+            r.style.display = "";
+        }else if(r.cells[2].innerHTML.includes("Position")){
+            r.style.display = "";
+        }else {
+            r.style.display = "none";
+        }
+    }
+}
+
+
+// tablesorter isn't working on positionTable, so I'm trying to make my own sort function
+function sortTable(){
+    var table = document.getElementById("contestDataTable");
+    var rows = table.rows;
+    var sorted = false;
+    while(!sorted){
+        sorted = true;
+        for(let i = 1; i < rows.length - 1; i++){
+            var row1 = rows[i];
+            var row2 = rows[i+1];
+            var proj1 = row1.cells[9].innerHTML;
+            var proj2 = row2.cells[9].innerHTML;
+            if(Number(proj1) < Number(proj2)){
+                sorted = false;
+                var temp = row1.innerHTML;
+                row1.innerHTML = row2.innerHTML;
+                row2.innerHTML = temp;
+            }
+        }
+    }
+}
+
+// Add event listener to contestDataTable to sort table when clicked
+contestDataTable.addEventListener('click', function(){
+    sortTable();
+});
