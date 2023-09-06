@@ -132,6 +132,7 @@ select.addEventListener('change', function(){
 // Make contestDataTable sortable
 $(function() {
     $("#contestDataTable").tablesorter();
+    loadTableData();
 });
 
 // Save contestDataTable data for access at a later date
@@ -488,8 +489,8 @@ function getPositionProjections(){
 
 
 // tablesorter isn't working on positionTable, so I'm trying to make my own sort function
-function sortTable(){
-    var table = document.getElementById("contestDataTable");
+function sortTable(t){
+    var table = document.getElementById(t);
     var rows = table.rows;
     var sorted = false;
     while(!sorted){
@@ -511,5 +512,95 @@ function sortTable(){
 
 // Add event listener to contestDataTable to sort table when clicked
 contestDataTable.addEventListener('click', function(){
-    sortTable();
+    sortTable("contestDataTable");
 });
+
+// Populate teamInfo table with data from contestDataTable
+function populateTeamInfo(){
+    var table = document.getElementById("defensesTable");
+    var rows = table.rows;
+    var teams = [];
+    for(let r of rows){
+        if(!teams.includes(r.cells[1].innerHTML.trim())){// && r.cells[8].innerHTML == document.getElementById("select").value)){
+            if(!r.cells[1].innerHTML.includes("Abbr")) teams.push(r.cells[1].innerHTML.trim());
+        }
+    }
+    var teamObjects = [];
+    var contestDataTable = document.getElementById("contestDataTable");
+    var cRows = contestDataTable.rows;
+    for(let t of teams){
+        var teamObject = {team:t};
+        let wasAssigned = {QB: false, RB1: false, RB2: false, WR1: false, WR2:false,WR3:false, TE: false, DST: false};
+
+        for(let r of cRows){
+            if(r.cells[3].innerHTML == t && r.cells[8].innerHTML == document.getElementById("select").value){
+                
+                if(r.cells[2].innerHTML.includes("QB") && !wasAssigned.QB){
+                    teamObject.QB = {player: r.cells[1].innerHTML, proj: r.cells[9].innerHTML, salary: r.cells[5].innerHTML};
+                    wasAssigned.QB = true;
+                }else if(r.cells[2].innerHTML == "RB" && !wasAssigned.RB1){
+                    teamObject.RB1 =  {player: r.cells[1].innerHTML, proj: r.cells[9].innerHTML, salary: r.cells[5].innerHTML};
+                    wasAssigned.RB1 = true;
+                }else if(r.cells[2].innerHTML == "RB" && !wasAssigned.RB2){
+                    teamObject.RB2 = {player: r.cells[1].innerHTML, proj: r.cells[9].innerHTML, salary: r.cells[5].innerHTML};
+                    wasAssigned.RB2 = true;
+                }else if(r.cells[2].innerHTML == "WR" && !wasAssigned.WR1){
+                    teamObject.WR1 =  {player: r.cells[1].innerHTML, proj: r.cells[9].innerHTML, salary: r.cells[5].innerHTML};
+                    wasAssigned.WR1 = true;
+                }else if(r.cells[2].innerHTML == "WR" && !wasAssigned.WR2){
+                    teamObject.WR2 =  {player: r.cells[1].innerHTML, proj: r.cells[9].innerHTML, salary: r.cells[5].innerHTML};
+                    wasAssigned.WR2 = true;
+                }else if(r.cells[2].innerHTML == "WR" && !wasAssigned.WR3){
+                    teamObject.WR3 =  {player: r.cells[1].innerHTML, proj: r.cells[9].innerHTML, salary: r.cells[5].innerHTML};
+                    wasAssigned.WR3 = true;
+                }else if(r.cells[2].innerHTML == "TE" && !wasAssigned.TE){
+                    teamObject.TE =  {player: r.cells[1].innerHTML, proj: r.cells[9].innerHTML, salary: r.cells[5].innerHTML};
+                    wasAssigned.TE = true;
+                }else if(r.cells[2].innerHTML == "DST" && !wasAssigned.DST){
+                    teamObject.DST =  {player: r.cells[1].innerHTML, proj: r.cells[9].innerHTML, salary: r.cells[5].innerHTML};
+                    wasAssigned.DST = true;
+                }
+
+            }
+        }
+        teamObjects.push(teamObject);
+    }
+    for(let o of teamObjects){
+        if(o.QB != undefined) {
+            var teamTable = document.getElementById("teamTable");
+            var row = teamTable.insertRow(-1);
+            row.insertCell(0).innerHTML = o.team;
+            row.insertCell(1).innerHTML = teamTableObjectToCell(o.QB);
+            row.insertCell(2).innerHTML = teamTableObjectToCell(o.RB1);
+            row.insertCell(3).innerHTML = teamTableObjectToCell(o.RB2);
+            row.insertCell(4).innerHTML = teamTableObjectToCell(o.WR1);
+            row.insertCell(5).innerHTML = teamTableObjectToCell(o.WR2);
+            row.insertCell(6).innerHTML = teamTableObjectToCell(o.WR3);
+            row.insertCell(7).innerHTML = teamTableObjectToCell(o.TE);
+            row.insertCell(8).innerHTML = teamTableObjectToCell(o.DST);
+
+            var totalProj = 0;
+            var totalSalary = 0;
+            for(let p of Object.values(o)){
+                if(p.proj != undefined){
+                    totalProj += Number(p.proj);
+                    totalSalary += Number(p.salary);
+                }
+            }
+            row.insertCell(9).innerHTML = totalProj.toFixed(1);
+            row.insertCell(10).innerHTML = totalSalary;
+            row.insertCell(11).innerHTML = (totalProj / totalSalary * 1000).toFixed(1);
+        }
+    }
+    document.getElementById("teamTable").addEventListener('click', function(){
+        sortTable("teamTable");
+    });
+}
+
+function teamTableObjectToCell(obj){
+    var cell = "";
+    if(obj != undefined){
+        cell= obj["player"] + "<br>" + obj["proj"] + "<br>" + obj["salary"];
+    }
+    return cell;
+}

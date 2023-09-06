@@ -16,6 +16,7 @@
         <div id="tabs">          
             <button id="contestInfo" class="tabButton">Contest Info</button>
             <button id="defensesInfo" class="tabButton">Defense Info</button>
+            <button id="teamInfo" class="tabButton">Team Info</button>
         </div>
         <div id="contest" class="contestDiv tabContent" style="display:block;width:100%">
             <div id="mainTableSection" class="splitScreen">
@@ -159,6 +160,30 @@
                     
                 </tbody>
             </table>   
+        </div>
+        <div id="team" class="tabContent" style="display:none">
+        <!-- Create a table summarizing sum of projections for all positions except DST in contestDataTable -->
+            <h2>Team Data</h2>
+            <button onclick="populateTeamInfo()">Update Team Data</button>            
+            <table id="teamTable" class="tablesorter">
+                <thead>
+                    <th>Team</th>
+                    <th>QB</th>
+                    <th>RB1</th>
+                    <th>RB2</th>
+                    <th>WR1</th>
+                    <th>WR2</th>
+                    <th>WR3</th>
+                    <th>TE</th>
+                    <th>DST</th>
+                    <th>Sum of Projections</th>
+                    <th>Sum of Salary</th>
+                    <th>Value</th>
+                </thead>
+                <tbody>
+                    
+                </tbody>
+            </table>
         </div>
 
         <div id="footer">
