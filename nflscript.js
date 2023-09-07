@@ -113,26 +113,13 @@ function addTableRows(playerData, selectedStartTime){
     
 }
     
-select.addEventListener('change', function(){
-    // hide rows that are not for the selected contest start time
-    var selectedStartTime = select.options[select.selectedIndex].innerHTML;
-    var table = document.getElementById("contestDataTable");
-    var rows = table.rows;
-    for (var i = 1; i < rows.length; i++) {
-        var row = rows[i];
-        var startTime = row.cells[8].innerHTML;
-        if(startTime != selectedStartTime){
-            row.style.display = "none";
-        }else{
-            row.style.display = "";
-        }
-    }
-})
+
 
 // Make contestDataTable sortable
 $(function() {
     //$("#contestDataTable").tablesorter(); // Not doing anything since I added my own sort function
     loadTableData();
+    fillTeamSelect();
 });
 
 // Save contestDataTable data for access at a later date
@@ -164,19 +151,21 @@ function loadTableData(){
     }
     // Add select options for each contest start time in the table
     var select = document.getElementById('select');
+
     var startTimes = [];
     var rows = table.rows;
     for (var i = 1; i < rows.length; i++) {
         var row = rows[i];
         var startTime = row.cells[8].innerHTML;
         // If start time is already in contestData, skip it. Otherwise add to startTimes
-        if (!startTimes.includes(startTime)) {
+        if (!startTimes.includes(startTime) && !startTime.includes("Tue")) {
             startTimes.push(startTime);
             var option = document.createElement("option");
             option.text = startTime;
             select.add(option);
         }
     }
+    document.getElementById('select2').innerHTML = document.getElementById('select').innerHTML;
     fillPlayerData();
 }
 
@@ -471,19 +460,49 @@ function teamAbbr(team){
     }
 }
 
+// Fill teamSelect with teams from contestDataTable
+function fillTeamSelect(){
+    var table = document.getElementById("contestDataTable");
+    var rows = table.rows;
+    var teams = [];
+    for(let r of rows){
+        if(!teams.includes(r.cells[3].innerHTML.trim())){
+            if(!r.cells[3].innerHTML.includes("Team")) teams.push(r.cells[3].innerHTML.trim());
+        }
+    }
+    var teamSelect = document.getElementById("teamSelect");
+    for(let t of teams){
+        var option = document.createElement("option");
+        option.text = t;
+        teamSelect.add(option);
+    }
+}
+
+
 function getPositionProjections(){
     var position = document.getElementById("positionSelect").value;
     var contestDataTable = document.getElementById("contestDataTable");
     var contestTime = document.getElementById("select").value;
+    var team = document.getElementById('teamSelect').value;
 
     for( let r of contestDataTable.rows){
-        if(r.cells[2].innerHTML == position && r.cells[8].innerHTML == contestTime){
+        if(r.rowIndex == 0) continue;
+        var pmatch = false;
+        var tmatch = false;
+        var teamMatch = false;
+        if(position == "All positions") pmatch = true;
+        if(r.cells[2].innerHTML == position) pmatch = true;
+        if(r.cells[8].innerHTML == contestTime) tmatch = true;
+        if(contestTime.includes("All slates")) tmatch = true;
+        if(team == "All teams") teamMatch = true;
+        if(r.cells[3].innerHTML == team) teamMatch = true;
+        
+        if(pmatch && tmatch && teamMatch){
             r.style.display = "";
-        }else if(r.cells[2].innerHTML.includes("Position")){
-            r.style.display = "";
-        }else {
+        }else{
             r.style.display = "none";
         }
+
     }
 }
 
@@ -658,9 +677,10 @@ function buildLineups(){
     var contestDataTable = document.getElementById("contestDataTable");
     var contestTime = document.getElementById("select").value;
     var players = [];
+    var variance = Number(document.getElementById("varianceValue").innerHTML.trim());
     for(let r of contestDataTable.rows){
         if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position")){
-            var player = {name: r.cells[1].innerHTML, id: r.cells[6].innerHTML, position: r.cells[2].innerHTML, team: r.cells[3].innerHTML, opponent: r.cells[4].innerHTML, salary: r.cells[5].innerHTML, proj: r.cells[9].innerHTML};
+            var player = {name: r.cells[1].innerHTML, id: r.cells[6].innerHTML, position: r.cells[2].innerHTML, team: r.cells[3].innerHTML, opponent: r.cells[4].innerHTML, salary: r.cells[5].innerHTML, proj: (Number(r.cells[9].innerHTML*variance/100*(Math.random()*2-1))+Number(r.cells[9].innerHTML)).toFixed(1)};
             players.push(player);
         }
     }
@@ -688,7 +708,8 @@ function buildLineups(){
     */
 }
 
-// Solve a draftkings lineup for a given contest start time
+// Solve a DraftKings classic lineup for a given contest start time
+// Solver from https://github.com/JWally/jsLPSolver
 function optimizeClassic(players){
     //var lineup = [];
     //var positions = ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "DST"];
@@ -769,7 +790,6 @@ function optimizeClassic(players){
         //console.log(solver);
         //console.log(model);
         results = solver.Solve(model);
-        console.log(results);
         addLineup(results, players);
     });
 
@@ -778,36 +798,204 @@ function optimizeClassic(players){
     
 }
 
-// Add lineup to lineupTable
+// Add lineup to lineupTable - classic
 function addLineup(lineup,players){
-    //console.log(Object.keys(lineup));
     var lineupTable = document.getElementById("lineupTable");
-
+    var row = lineupTable.insertRow(-1);
     var lineupForTable = [];
     for(let k of Object.keys(lineup)){
         if(k != "feasible" && k != "result" && k != "bounded" && k != "iterations" && k != "time" && k != "dual" && k != "primal" && k != "isIntegral"){
             var found = false, x=0;
             while(!found && x < players.length){
-                if(players[x].name == k) found = true; // let's find a way to do this with ids instead of names
+                if(players[x].name.trim() == k.trim()) found = true; 
                 else x++;
             }
             lineupForTable.push(players[x]);
         }
     }
     // order lineupForTable by position
-    var orderedLineup = [];
-    var positions = ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "DST"];
-    for(let p of positions){
-        var found = false, x=0;
-        while(!found && x < lineupForTable.length){
-            if(lineupForTable[x].position == p) found = true;
-            else x++;
+    var QBs = [];
+    var RBs = [];
+    var WRs = [];
+    var TEs = [];
+    var DSTs = [];
+    var FLEX = [];
+    
+    for(let k of Object.keys(lineupForTable)){
+        let p = lineupForTable[k];
+        if(p.position == "QB"){
+            QBs.push(p);
+        }else if(p.position == "RB"){
+            if(RBs.length == 2) FLEX.push(p); else RBs.push(p);
+        }else if(p.position == "WR"){
+            if(WRs.length == 3) FLEX.push(p); else WRs.push(p);
+        }else if(p.position == "TE"){
+            if(TEs.length == 1) FLEX.push(p); else TEs.push(p);
+        }else if(p.position == "DST"){
+            DSTs.push(p);
         }
-        orderedLineup.push(lineupForTable[x]);
     }
-    var row = lineupTable.insertRow(-1);
+    var orderedLineup = [];
+    for(let p of QBs){
+        orderedLineup.push(p);
+    }
+    for(let p of RBs){
+        orderedLineup.push(p);
+    }
+    for(let p of WRs){
+        orderedLineup.push(p);
+    }
+    for(let p of TEs){
+        orderedLineup.push(p);
+    }
+    for(let p of FLEX){
+        orderedLineup.push(p);
+    }
+    for(let p of DSTs){
+        orderedLineup.push(p);
+    }
+
     for(let p of orderedLineup){
         var cell = row.insertCell(-1);
         cell.innerHTML = p.name + "<br>" + p.team + "<br>" + p.salary + "<br>" + p.proj;
     }
+}
+
+
+function pickBuilder(section, event){
+    var builderButtons = document.getElementsByClassName("builderButton");
+    for(let b of builderButtons){
+        b.style.backgroundColor = "#272727";
+    }
+    event.target.style.backgroundColor = "blue";
+    var builderSections = document.getElementsByClassName("builderSection");
+    for(let s of builderSections){
+        if(s.id == section){
+            s.style.display = "block";
+        }else{
+            s.style.display = "none";
+        }
+    }
+}
+
+// Create a showdown lineup for a given contest start time
+function buildShowdownLineups(){
+    var contestDataTable = document.getElementById("contestDataTable");
+    var contestTime = document.getElementById("select").value;
+    var players = [];
+    var variance = Number(document.getElementById("varianceValue").innerHTML.trim());
+
+    for(let r of contestDataTable.rows){
+        if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position")){
+            var player = {name: r.cells[1].innerHTML, id: r.cells[6].innerHTML, position: r.cells[2].innerHTML, team: r.cells[3].innerHTML, opponent: r.cells[4].innerHTML, salary: r.cells[5].innerHTML, proj: (Number(r.cells[9].innerHTML*variance/100*(Math.random()*2-1))+Number(r.cells[9].innerHTML)).toFixed(1)};
+            players.push(player);
+        }
+    }
+    optimizeShowdown(players);
+}
+
+// Solve a DraftKings showdown lineup for a given contest start time
+function optimizeShowdown(players){
+    var modelVariables = {};
+    for(let p of players){
+        let pid = p.id;
+        let pteam = p.team;
+        modelVariables[p.name] = {"proj": p.proj, "salary": p.salary, "i": 1, "CPT": 0};
+        modelVariables[p.name][pid] = 1;
+        modelVariables[p.name][pteam] = 1;
+
+        modelVariables["CPT "+p.name] = {"proj": p.proj * 1.5, "salary": p.salary * 1.5, "i": 1, "CPT": 1};
+        modelVariables["CPT "+p.name][pid] = 1;
+        modelVariables["CPT "+p.name][pteam] = 1;
+    }
+
+
+    var results;
+    require(['solver'], function(solver) {
+        var model = {
+            "optimize": "proj",
+            "opType": "max",
+            "constraints": {
+                "salary": {"max": 50000},
+                "i": {"equal": 6},
+                "CPT": {"equal": 1}
+            },  
+            "variables": modelVariables,
+            "ints": {}
+        };
+
+        for(let p of players){
+            model.constraints[p.id] = {"max": 1};
+            model.constraints[p.team] = {"max": 5};
+            model.ints[p.name] = 1;
+            model.ints["CPT "+p.name] = 1;
+        }
+        //console.log(solver);
+        //console.log(model);
+        results = solver.Solve(model);
+        addLineupShowdown(results, players);
+    });
+}
+
+// Add lineup to showdownLineupTable
+function addLineupShowdown(lineup,players){
+    console.log(lineup);
+    var lineupTable = document.getElementById("showdownLineupTable");
+    var row = lineupTable.insertRow(-1);
+    var lineupForTable = [];
+    for(let k of Object.keys(lineup)){
+        if(k != "feasible" && k != "result" && k != "bounded" && k != "iterations" && k != "time" && k != "dual" && k != "primal" && k != "isIntegral"){
+            var found = false, x=0, isCPT = false;
+            while(!found && x < players.length){
+                if(players[x].name.trim() == k.trim()){ 
+                    found = true; 
+                } else if(players[x].name.trim() == k.replace("CPT ", "").trim()){
+                    found = true;
+                    isCPT = true;
+                } else x++;
+            }
+            if(isCPT){
+                lineupForTable.push({name: "CPT "+players[x].name, team: players[x].team, salary: players[x].salary*1.5, proj: players[x].proj * 1.5});
+            }else{
+                lineupForTable.push(players[x]);
+            }
+        }
+    }
+    // order lineupForTable by position
+    var cpts = [];
+    var flexs = [];
+    console.log(lineupForTable);
+    for(let p of lineupForTable){
+        if(p.name.includes("CPT")){
+            cpts.push(p);
+        }else{
+            flexs.push(p);
+        }
+    }
+
+    var orderedLineup = [];
+    for(let p of cpts){
+        orderedLineup.push(p);
+    }
+    for(let p of flexs){
+        orderedLineup.push(p);
+    }
+
+    for(let p of orderedLineup){
+        var cell = row.insertCell(-1);
+        cell.innerHTML = p.name + "<br>" + p.team + "<br>" + p.salary + "<br>" + Number(p.proj).toFixed(1);
+    }
+}
+
+// Add variance to lineup builder based on slider value
+function updateSlider(){
+    var slider = document.getElementById("varianceSlider");
+    var variance = slider.value;
+    document.getElementById("varianceValue").innerHTML = variance;
+}
+
+// Causes slate change from "Builder" tab to update "Contest Info" tab
+function updateOtherSelect(){
+    var otherSelect = document.getElementById("select2").value;
+    document.getElementById("select").value = otherSelect;
 }

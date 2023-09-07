@@ -47,7 +47,7 @@ body{
     padding: 20px;
 }
 #tabs{
-    background: linear-gradient(#dff18c, #283300);
+    background: linear-gradient( #283300, #eeeeee);
     width: 100%;
     padding: 10px;
 }
@@ -55,10 +55,6 @@ body{
     background: linear-gradient(#dff18c, #283300);
     width: 100%;
     padding: 10px;
-}
-#playerAboutSection{
-    width: 30%;
-    float:left;
 }
 #mainTableSection{
     width: auto;
@@ -73,7 +69,54 @@ body{
     background: linear-gradient(#51ff00, #272727);
 
 }
+.contestDiv:after{
+    content: "";
+    display: table;
+    clear: both;
+}
 .splitScreen{
+    float:left;
     overflow-y: auto;
+    width: 50%;
     height:100vh;
+}
+.sectionHeader{
+    width: 100%;
+    height: 100%;
+    background: #eeeeee;
+    color: black;
+    padding: 10px;
+}
+.builderButton{
+    height: 100%;
+    width: auto;
+    padding: 10px;
+    font-size: 16px;
+    font-weight: 700;
+    background: #272727;
+}
+html{
+    background-color: #dddddd;
+}
+#header{
+    background: #272727;
+    width: 100%;
+    padding: 10px;
+    text-align: left;
+}
+h1{
+    font-family: 'Roboto', sans-serif;
+    font-size: 40px;
+    color: white;
+}
+h4{
+    font-family: 'Roboto', sans-serif;
+    color: black;
+}
+.builderSection{
+    width: 100%;
+    height: 100%;
+    background: #eeeeee;
+    color: black;
+    padding: 10px;
 }

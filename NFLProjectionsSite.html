@@ -13,7 +13,7 @@
 <body>
     <div id="wrapper">
         <div id="header">
-            <h1>NFL Projections</h1>
+            <h1>NFL Data</h1>
         </div>
         <div id="tabs">          
             <button id="contestInfo" class="tabButton">Contest Info</button>
@@ -28,15 +28,16 @@
                         <td><button id="getPlayerData" onclick="getContestData()">Scrape Contest Data</button></td>
                         <td><button id="saveTableData" onclick="saveTableData()">Save Table Data</button></td>
                         <td><button id="loadTableData" onclick="loadTableData()">Load Table Data</button></td>
-                        <td><select id="select"><option value="default">Select Contest Start Time</option></select></td>
+                        <td><select id="select" onchange="getPositionProjections()"><option value="All slates">All slates</option></select></td>
                         <td><select id="positionSelect" onchange="getPositionProjections()">
-                            <option value="default">Select Position</option>
+                            <option value="All positions">All positions</option>
                             <option value="QB">QB</option>
                             <option value="RB">RB</option>
                             <option value="WR">WR</option>
                             <option value="TE">TE</option>
                             <option value="DST">DST</option>
                         </select></td>
+                        <td><select id="teamSelect" onchange="getPositionProjections()"><option value="All teams">All teams</option></option></select></td>
                     </table>
                 </div>
                 <div id="table">
@@ -145,8 +146,9 @@
             </div>
         </div>
         <div id="defenses" class="tabContent" style="display:none">
-            <h2>Defense Data</h2>
-            <h4>Stats are normalized against mean and standard deviations of projections across league</h4>
+            <div class="sectionHeader">
+                <h4>Defense Data<br>Stats are normalized against mean and standard deviations of projections across league</h4>
+            </div>
             <button onclick="getDefenseProjections()">Scrape Defense Data</button>
             
             <table id="defensesTable" class="tablesorter">
@@ -166,7 +168,10 @@
         </div>
         <div id="team" class="tabContent" style="display:none">
         <!-- Create a table summarizing sum of projections for all positions except DST in contestDataTable -->
-            <h2>Team Data</h2>
+            <div class="sectionHeader">
+                <h4>Team Data</h4>
+            </div>    
+        
             <button onclick="populateTeamInfo()">Update Team Data</button>            
             <table id="teamTable" class="tablesorter">
                 <tr>
@@ -189,23 +194,46 @@
             </table>
         </div>
         <div id="builder" class="tabContent" style="display:none">
-            <button onclick="buildLineups()">Build Lineups</button>
-            <table id="lineupTable">
-                <thead>
-                    <th>QB</th>
-                    <th>RB1</th>
-                    <th>RB2</th>
-                    <th>WR1</th>
-                    <th>WR2</th>
-                    <th>WR3</th>
-                    <th>TE</th>
-                    <th>FLEX</th>
-                    <th>DST</th>
-                </thead>
-                <tbody>
-                    
-                </tbody>
-            </table>
+            <div class="sectionHeader">
+                Pick a slate to optimize: <select id="select2" onchange="updateOtherSelect()"><option value="All slates">All slates</option></select>
+                Slate type: <button class="builderButton" onclick="pickBuilder('Classic', event)" style="background-color: blue;">Classic</button><button class="builderButton" onclick="pickBuilder('Showdown', event)">Showdown</button>
+                <label for="slider">Variance (percent of projection): <text id="varianceValue">50</text>%</label><input type="range" id="varianceSlider" value="50" min="0" max="100" step="5" onchange="updateSlider()">
+            </div>
+            <div id="Classic" class="builderSection">
+                <button onclick="buildLineups()">Build Lineup</button>
+                <table id="lineupTable">
+                    <thead>
+                        <th>QB</th>
+                        <th>RB1</th>
+                        <th>RB2</th>
+                        <th>WR1</th>
+                        <th>WR2</th>
+                        <th>WR3</th>
+                        <th>TE</th>
+                        <th>FLEX</th>
+                        <th>DST</th>
+                    </thead>
+                    <tbody>
+                        
+                    </tbody>
+                </table>
+            </div>
+            <div id="Showdown" style="display:none" class="builderSection">
+                <button onclick="buildShowdownLineups()">Build Lineup</button>
+                <table id="showdownLineupTable">
+                    <thead>
+                        <th>Captain</th>
+                        <th>Flex1</th>
+                        <th>Flex2</th>
+                        <th>Flex3</th>
+                        <th>Flex4</th>
+                        <th>Flex5</th>
+                    </thead>
+                    <tbody>
+                        
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <div id="footer">
