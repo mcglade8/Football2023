@@ -131,7 +131,7 @@ select.addEventListener('change', function(){
 
 // Make contestDataTable sortable
 $(function() {
-    $("#contestDataTable").tablesorter();
+    //$("#contestDataTable").tablesorter(); // Not doing anything since I added my own sort function
     loadTableData();
 });
 
@@ -262,7 +262,7 @@ function updateProjections(){
     var receivingTDs = document.getElementById("receivingTDs").value;
 
     var proj = (passingYards * 0.04) + (passingTDs * 4) + (interceptions * -1) + (rushingYards * 0.1) + (rushingTDs * 6) + (receptions * 1) + (receivingYards * 0.1) + (receivingTDs * 6);
-    calcProj.innerHTML = proj.toFixed(2);
+    calcProj.innerHTML = proj.toFixed(1);
 }
 
 // Reset inputs to 0 when another row is clicked
@@ -489,7 +489,7 @@ function getPositionProjections(){
 
 
 // tablesorter isn't working on positionTable, so I'm trying to make my own sort function
-function sortTable(t){
+function sortTable(t, c){
     var table = document.getElementById(t);
     var rows = table.rows;
     var sorted = false;
@@ -498,8 +498,13 @@ function sortTable(t){
         for(let i = 1; i < rows.length - 1; i++){
             var row1 = rows[i];
             var row2 = rows[i+1];
-            var proj1 = row1.cells[9].innerHTML;
-            var proj2 = row2.cells[9].innerHTML;
+            if(table.getAttribute('id')== "teamTable"){
+                var proj1 = row1.cells[c].getAttribute('proj');
+                var proj2 = row2.cells[c].getAttribute('proj');
+            }else{
+                var proj1 = row1.cells[c].innerHTML;
+                var proj2 = row2.cells[c].innerHTML;
+            }
             if(Number(proj1) < Number(proj2)){
                 sorted = false;
                 var temp = row1.innerHTML;
@@ -510,10 +515,8 @@ function sortTable(t){
     }
 }
 
-// Add event listener to contestDataTable to sort table when clicked
-contestDataTable.addEventListener('click', function(){
-    sortTable("contestDataTable");
-});
+// Sort contestDataTable by projected points
+sortTable("contestDataTable", 9);
 
 // Populate teamInfo table with data from contestDataTable
 function populateTeamInfo(){
@@ -570,14 +573,15 @@ function populateTeamInfo(){
             var teamTable = document.getElementById("teamTable");
             var row = teamTable.insertRow(-1);
             row.insertCell(0).innerHTML = o.team;
-            row.insertCell(1).innerHTML = teamTableObjectToCell(o.QB);
-            row.insertCell(2).innerHTML = teamTableObjectToCell(o.RB1);
-            row.insertCell(3).innerHTML = teamTableObjectToCell(o.RB2);
-            row.insertCell(4).innerHTML = teamTableObjectToCell(o.WR1);
-            row.insertCell(5).innerHTML = teamTableObjectToCell(o.WR2);
-            row.insertCell(6).innerHTML = teamTableObjectToCell(o.WR3);
-            row.insertCell(7).innerHTML = teamTableObjectToCell(o.TE);
-            row.insertCell(8).innerHTML = teamTableObjectToCell(o.DST);
+            // Add cells for each position and pass the max expectation for that position to colorScale
+            row.appendChild(teamTableObjectToCell(o.QB, 35).cloneNode(true));
+            row.appendChild(teamTableObjectToCell(o.RB1, 30).cloneNode(true));
+            row.appendChild(teamTableObjectToCell(o.RB2, 30).cloneNode(true));
+            row.appendChild(teamTableObjectToCell(o.WR1, 30).cloneNode(true));
+            row.appendChild(teamTableObjectToCell(o.WR2, 30).cloneNode(true));
+            row.appendChild(teamTableObjectToCell(o.WR3, 30).cloneNode(true));
+            row.appendChild(teamTableObjectToCell(o.TE, 28).cloneNode(true));
+            row.appendChild(teamTableObjectToCell(o.DST, 16).cloneNode(true));
 
             var totalProj = 0;
             var totalSalary = 0;
@@ -592,15 +596,218 @@ function populateTeamInfo(){
             row.insertCell(11).innerHTML = (totalProj / totalSalary * 1000).toFixed(1);
         }
     }
-    document.getElementById("teamTable").addEventListener('click', function(){
-        sortTable("teamTable");
-    });
+    // Sort teamTable by projected points
+    sortTable("teamTable", 9);
+    
 }
 
-function teamTableObjectToCell(obj){
-    var cell = "";
+function teamTableObjectToCell(obj, max){
+    var content = "";
     if(obj != undefined){
-        cell= obj["player"] + "<br>" + obj["proj"] + "<br>" + obj["salary"];
+        content= obj["player"] + "<br>" + obj["proj"] + "<br>" + obj["salary"];
     }
+
+    var cell = document.createElement('td');
+    cell.innerHTML = content;
+    cell.setAttribute('proj', obj["proj"]);
+    cell.setAttribute('salary', obj["salary"]);
+    cell.style.backgroundColor = colorScale(obj["proj"], max);
+
     return cell;
+}
+
+// Add color scale to stylize elements based on their projected points
+function colorScale(proj, max){
+    var perc = proj / max * 100;
+    if(perc > 100) perc = 100;
+    var r, g, b = 0;
+    if(perc < 50) {
+		r = 255;
+		g = Math.round(5.1 * perc);
+	}
+	else {
+		g = 255;
+		r = Math.round(510 - 5.10 * perc);
+	}
+	var h = r * 0x10000 + g * 0x100 + b * 0x1;
+	return '#' + ('000000' + h.toString(16)).slice(-6);
+}
+
+// Add event listener to all table headers to sort table by that column
+var tables = document.getElementsByTagName("table");
+for(let t of tables){
+    var headers = t.getElementsByTagName("th");
+    for(let h of headers){
+        h.addEventListener('click', function(){
+            sortTable(t.id, h.cellIndex);
+        })
+    }
+}
+
+// *** Annual stats expected for NFL teams ***
+// Interceptions range from 11-20
+// Plays run range from 950-1150
+// Rushing yards range from 1500-300
+// Rushing TDs range from 5-23
+// Passing yards range from 2600-4800
+// Passing TDs range from 15-40
+
+// Solve a draftkings lineup for a given contest start time
+function buildLineups(){
+
+    var contestDataTable = document.getElementById("contestDataTable");
+    var contestTime = document.getElementById("select").value;
+    var players = [];
+    for(let r of contestDataTable.rows){
+        if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position")){
+            var player = {name: r.cells[1].innerHTML, id: r.cells[6].innerHTML, position: r.cells[2].innerHTML, team: r.cells[3].innerHTML, opponent: r.cells[4].innerHTML, salary: r.cells[5].innerHTML, proj: r.cells[9].innerHTML};
+            players.push(player);
+        }
+    }
+    optimizeClassic(players);
+/*
+    let myPromise = new Promise(function(resolve) {
+        
+        
+        
+        var contestDataTable = document.getElementById("contestDataTable");
+        var contestTime = document.getElementById("select").value;
+        var players = [];
+        for(let r of contestDataTable.rows){
+            if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position")){
+                var player = {name: r.cells[1].innerHTML, id: r.cells[6].innerHTML, position: r.cells[2].innerHTML, team: r.cells[3].innerHTML, opponent: r.cells[4].innerHTML, salary: r.cells[5].innerHTML, proj: r.cells[9].innerHTML};
+                players.push(player);
+            }
+        }
+        resolve(optimizeClassic(players));
+
+    });
+    var lineup = await myPromise;//optimizeClassic(players);
+    console.log(lineup);
+    addLineup(lineup);
+    */
+}
+
+// Solve a draftkings lineup for a given contest start time
+function optimizeClassic(players){
+    //var lineup = [];
+    //var positions = ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "DST"];
+    var salaryCap = 50000;
+    var QBs = [];
+    var RBs = [];
+    var WRs = [];
+    var TEs = [];
+    var FLEXs = [];
+    var DSTs = [];
+    for(let p of players){
+        if(p.position == "QB"){
+            QBs.push(p);
+        }else if(p.position == "RB"){
+            RBs.push(p);
+            FLEXs.push(p);
+        }else if(p.position == "WR"){
+            WRs.push(p);
+            FLEXs.push(p);
+        }else if(p.position == "TE"){
+            TEs.push(p);
+            FLEXs.push(p);
+        }else if(p.position == "DST"){
+            DSTs.push(p);
+        }
+    }
+    var modelVariables = {};
+    for(let p of QBs){
+        let pid = p.id;
+        modelVariables[p.name] = {"proj": p.proj, "salary": p.salary, "QB": 1, "i": 1};
+        modelVariables[p.name][pid] = 1;
+    }
+    for(let p of RBs){
+        let pid = p.id;
+        modelVariables[p.name] = {"id": p.id, "proj": p.proj, "salary": p.salary, "RB": 1, "FLEX": 1, "i": 1};
+        modelVariables[p.name][pid] = 1;
+    }
+    for(let p of WRs){
+        let pid = p.id;
+        modelVariables[p.name] = {"id": p.id, "proj": p.proj, "salary": p.salary, "WR": 1, "FLEX": 1, "i": 1};
+        modelVariables[p.name][pid] = 1;
+    }
+    for(let p of TEs){
+        let pid = p.id;
+        modelVariables[p.name] = {"id": p.id,"proj": p.proj, "salary": p.salary, "TE": 1, "FLEX": 1, "i": 1};
+        modelVariables[p.name][pid] = 1;
+    }
+    for(let p of DSTs){
+        let pid = p.id;
+        modelVariables[p.name] = {"id": p.id,"proj": p.proj, "salary": p.salary, "DST": 1, "i": 1};
+        modelVariables[p.name][pid] = 1;
+    }
+
+
+    var results;
+    require(['solver'], function(solver) {
+        var model = {
+            "optimize": "proj",
+            "opType": "max",
+            "constraints": {
+                "salary": {"max": salaryCap},
+                "QB": {"equal": 1},
+                "RB": {"min": 2},
+                "WR": {"min": 3},
+                "TE": {"min": 1},
+                "FLEX": {"equal": 7},
+                "DST": {"equal": 1},
+                "i": {"equal": 9}
+            },  
+            "variables": modelVariables,
+            "ints": {}
+        };
+
+        for(let p of players){
+            model.constraints[p.id] = {"max": 1};
+            model.ints[p.name] = 1;
+        }
+        //console.log(solver);
+        //console.log(model);
+        results = solver.Solve(model);
+        console.log(results);
+        addLineup(results, players);
+    });
+
+    //return results;
+    
+    
+}
+
+// Add lineup to lineupTable
+function addLineup(lineup,players){
+    //console.log(Object.keys(lineup));
+    var lineupTable = document.getElementById("lineupTable");
+
+    var lineupForTable = [];
+    for(let k of Object.keys(lineup)){
+        if(k != "feasible" && k != "result" && k != "bounded" && k != "iterations" && k != "time" && k != "dual" && k != "primal" && k != "isIntegral"){
+            var found = false, x=0;
+            while(!found && x < players.length){
+                if(players[x].name == k) found = true; // let's find a way to do this with ids instead of names
+                else x++;
+            }
+            lineupForTable.push(players[x]);
+        }
+    }
+    // order lineupForTable by position
+    var orderedLineup = [];
+    var positions = ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "DST"];
+    for(let p of positions){
+        var found = false, x=0;
+        while(!found && x < lineupForTable.length){
+            if(lineupForTable[x].position == p) found = true;
+            else x++;
+        }
+        orderedLineup.push(lineupForTable[x]);
+    }
+    var row = lineupTable.insertRow(-1);
+    for(let p of orderedLineup){
+        var cell = row.insertCell(-1);
+        cell.innerHTML = p.name + "<br>" + p.team + "<br>" + p.salary + "<br>" + p.proj;
+    }
 }
