@@ -197,10 +197,13 @@
             <div class="sectionHeader">
                 Pick a slate to optimize: <select id="select2" onchange="updateOtherSelect()"><option value="All slates">All slates</option></select>
                 Slate type: <button class="builderButton" onclick="pickBuilder('Classic', event)" style="background-color: blue;">Classic</button><button class="builderButton" onclick="pickBuilder('Showdown', event)">Showdown</button>
-                <label for="slider">Variance (percent of projection): <text id="varianceValue">50</text>%</label><input type="range" id="varianceSlider" value="50" min="0" max="100" step="5" onchange="updateSlider()">
+                <label for="slider">Variance: <text id="varianceValue">5</text></label><input type="range" id="varianceSlider" value="5" min="0" max="10" step="1" onchange="updateSlider()">
+            </div>
+            <div id="builderControl">
+                Lineups to build: <input type="number" id="lineupsToBuild" value="1" min="1" max="150">
+                <button class="buildLineups" onclick="iterateBuild('Classic')">Build Lineup</button><button class="buildLineups" onclick="iterateBuild('Showdown')" style="display:none">Build Lineup</button>
             </div>
             <div id="Classic" class="builderSection">
-                <button onclick="buildLineups()">Build Lineup</button>
                 <table id="lineupTable">
                     <thead>
                         <th>QB</th>
@@ -219,7 +222,6 @@
                 </table>
             </div>
             <div id="Showdown" style="display:none" class="builderSection">
-                <button onclick="buildShowdownLineups()">Build Lineup</button>
                 <table id="showdownLineupTable">
                     <thead>
                         <th>Captain</th>

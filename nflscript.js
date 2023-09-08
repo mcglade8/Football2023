@@ -671,41 +671,45 @@ for(let t of tables){
 // Passing yards range from 2600-4800
 // Passing TDs range from 15-40
 
-// Solve a draftkings lineup for a given contest start time
-function buildLineups(){
+// run buildLineups() in a loop but don't start over until all data is loaded
+async function iterateBuild(type, built = 0){
+    var lineupsToBuild = Number(document.getElementById("lineupsToBuild").value);
 
-    var contestDataTable = document.getElementById("contestDataTable");
-    var contestTime = document.getElementById("select").value;
-    var players = [];
-    var variance = Number(document.getElementById("varianceValue").innerHTML.trim());
-    for(let r of contestDataTable.rows){
-        if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position")){
-            var player = {name: r.cells[1].innerHTML, id: r.cells[6].innerHTML, position: r.cells[2].innerHTML, team: r.cells[3].innerHTML, opponent: r.cells[4].innerHTML, salary: r.cells[5].innerHTML, proj: (Number(r.cells[9].innerHTML*variance/100*(Math.random()*2-1))+Number(r.cells[9].innerHTML)).toFixed(1)};
-            players.push(player);
+    if(type=="Classic"){
+        let promise = new Promise(function(resolve) {
+            setTimeout(resolve(buildLineups()), 500);
+        });
+
+        promise.then(function() {
+            built++;
+            if(built < lineupsToBuild){
+                iterateBuild(type, built);
+            }
+        });
+    }else{
+        buildShowdownLineups();
+        built++;
+        if(built < lineupsToBuild){
+            setTimeout(function(){iterateBuild(type, built)}, 500);
         }
     }
-    optimizeClassic(players);
-/*
-    let myPromise = new Promise(function(resolve) {
-        
-        
-        
+}
+
+// Solve a draftkings lineup for a given contest start time
+function buildLineups(){
         var contestDataTable = document.getElementById("contestDataTable");
         var contestTime = document.getElementById("select").value;
         var players = [];
+        var variance = Number(document.getElementById("varianceValue").innerHTML.trim());
         for(let r of contestDataTable.rows){
             if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position")){
-                var player = {name: r.cells[1].innerHTML, id: r.cells[6].innerHTML, position: r.cells[2].innerHTML, team: r.cells[3].innerHTML, opponent: r.cells[4].innerHTML, salary: r.cells[5].innerHTML, proj: r.cells[9].innerHTML};
+                var player = {name: r.cells[1].innerHTML, id: r.cells[6].innerHTML, position: r.cells[2].innerHTML, team: r.cells[3].innerHTML, opponent: r.cells[4].innerHTML, salary: r.cells[5].innerHTML, proj: (Number(r.cells[9].innerHTML)+variance*(Math.random()-.5)).toFixed(1)};
                 players.push(player);
             }
         }
-        resolve(optimizeClassic(players));
-
-    });
-    var lineup = await myPromise;//optimizeClassic(players);
-    console.log(lineup);
-    addLineup(lineup);
-    */
+        players = correlateByTeam(players);
+        optimizeClassic(players);
+    
 }
 
 // Solve a DraftKings classic lineup for a given contest start time
@@ -876,22 +880,65 @@ function pickBuilder(section, event){
             s.style.display = "none";
         }
     }
+    
+    if(section == "Classic") {
+        document.getElementsByClassName("buildLineups")[0].style.display="";
+        document.getElementsByClassName("buildLineups")[1].style.display="none";
+    } else{
+        document.getElementsByClassName("buildLineups")[0].style.display="none";
+        document.getElementsByClassName("buildLineups")[1].style.display="";
+    }
+    
+
 }
 
 // Create a showdown lineup for a given contest start time
 function buildShowdownLineups(){
-    var contestDataTable = document.getElementById("contestDataTable");
-    var contestTime = document.getElementById("select").value;
-    var players = [];
-    var variance = Number(document.getElementById("varianceValue").innerHTML.trim());
+    
+        var contestDataTable = document.getElementById("contestDataTable");
+        var contestTime = document.getElementById("select").value;
+        var players = [];
+        var variance = Number(document.getElementById("varianceValue").innerHTML.trim());
 
-    for(let r of contestDataTable.rows){
-        if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position")){
-            var player = {name: r.cells[1].innerHTML, id: r.cells[6].innerHTML, position: r.cells[2].innerHTML, team: r.cells[3].innerHTML, opponent: r.cells[4].innerHTML, salary: r.cells[5].innerHTML, proj: (Number(r.cells[9].innerHTML*variance/100*(Math.random()*2-1))+Number(r.cells[9].innerHTML)).toFixed(1)};
-            players.push(player);
+        for(let r of contestDataTable.rows){
+            if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position")){
+                var player = {name: r.cells[1].innerHTML, id: r.cells[6].innerHTML, position: r.cells[2].innerHTML, team: r.cells[3].innerHTML, opponent: r.cells[4].innerHTML, salary: r.cells[5].innerHTML, proj: (Number(r.cells[9].innerHTML)+variance*(Math.random()-.5)).toFixed(1)};
+                players.push(player);
+            }
+        }
+        players = correlateByTeam(players);
+        optimizeShowdown(players);
+    
+}
+
+// Manipulate projections to correlate by team
+function correlateByTeam(players){
+    var teamProjections = {};
+    for(let p of players){
+        if(teamProjections[p.team] == undefined){
+            teamProjections[p.team] = {correlate: (Math.random()*2-1)};
         }
     }
-    optimizeShowdown(players);
+    for(let p of players){
+        switch(p.position){
+            case "QB":
+                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * 0.8)).toFixed(1);
+                break;
+            case "RB":
+                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * 0.6)).toFixed(1);
+                break;
+            case "WR":
+                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * 0.4)).toFixed(1);
+                break;
+            case "TE":
+                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * 0.2)).toFixed(1);
+                break;
+            case "DST":
+                p.proj = (p.proj * (1 + teamProjections[p.opponent].correlate * 0.9)).toFixed(1);
+                break;
+        }
+    }
+    return players;
 }
 
 // Solve a DraftKings showdown lineup for a given contest start time
