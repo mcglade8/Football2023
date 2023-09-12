@@ -8,7 +8,7 @@
     <script src="jquery.tablesorter.min.js"></script>
     <script src="solver.js"></script>
     <script src="require.js"></script>
-
+    
 </head>
 <body>
     <div id="wrapper">
@@ -20,6 +20,8 @@
             <button id="defensesInfo" class="tabButton">Defense Info</button>
             <button id="teamInfo" class="tabButton">Team Info</button>
             <button id="builderInfo" class="tabButton">Builder</button>
+            <button id="setPlayerMediansInfo" class="tabButton">Set Player Medians</button>
+            <button id="setTeamMediansInfo" class="tabButton">Set Team Medians</button>
         </div>
         <div id="contest" class="contestDiv tabContent" style="display:block;width:100%">
             <div id="mainTableSection" class="splitScreen">
@@ -197,11 +199,20 @@
             <div class="sectionHeader">
                 Pick a slate to optimize: <select id="select2" onchange="updateOtherSelect()"><option value="All slates">All slates</option></select>
                 Slate type: <button class="builderButton" onclick="pickBuilder('Classic', event)" style="background-color: blue;">Classic</button><button class="builderButton" onclick="pickBuilder('Showdown', event)">Showdown</button>
-                <label for="slider">Variance: <text id="varianceValue">5</text></label><input type="range" id="varianceSlider" value="5" min="0" max="10" step="1" onchange="updateSlider()">
+                <label style="float:none" for="slider">Variance: <text id="varianceValue">5</text></label><input type="range" id="varianceSlider" value="5" min="0" max="10" step="1" onchange="updateSlider()">
             </div>
-            <div id="builderControl">
+            <div id="builderControl" class="sectionHeader">
                 Lineups to build: <input type="number" id="lineupsToBuild" value="1" min="1" max="150">
-                <button class="buildLineups" onclick="iterateBuild('Classic')">Build Lineup</button><button class="buildLineups" onclick="iterateBuild('Showdown')" style="display:none">Build Lineup</button>
+                <button class="buildLineups" onclick="buildLineups()">Build Lineup</button><button class="buildLineups" onclick="buildShowdownLineups()" style="display:none">Build Lineup</button>
+                <!-- Have user upload .csv of contest info they want to build for -->
+                <div class="csvSection">
+                    <label style="float:none" for="contestcsv">Import salaries: </label><input type="file" name="contestcsv" id="contestcsv" oninput="handlecsv()">
+                    <button onclick="downloadLineupsShowdown()">Download Lineups for Initial Upload</button>
+                </div>
+                <div class="csvSection">
+                    <label style="float:none" for="editcsv">Lineups for edit: </label><input type="file" name="editcsv" id="editcsv" oninput="handleLineupscsv()">
+                    <button onclick="downloadEditedLineupsShowdown()">Download Edited Lineups</button>
+                </div>
             </div>
             <div id="Classic" class="builderSection">
                 <table id="lineupTable">
@@ -215,6 +226,8 @@
                         <th>TE</th>
                         <th>FLEX</th>
                         <th>DST</th>
+                        <th>Salary</th>
+                        <th>Projection</th>
                     </thead>
                     <tbody>
                         
@@ -230,6 +243,8 @@
                         <th>Flex3</th>
                         <th>Flex4</th>
                         <th>Flex5</th>
+                        <th>Salary</th>
+                        <th>Projection</th>
                     </thead>
                     <tbody>
                         
@@ -237,7 +252,79 @@
                 </table>
             </div>
         </div>
-
+        <div id="setPlayerMedians" class="tabContent" style="display:none">
+            <div class="sectionHeader">
+                <h4>Set player medians - percent of team's total</h4>
+                <select id="teamSelectMedians" onchange="filterTeamsMedians()"><option value="All teams">All teams</option></select>
+            </div>
+            <div>
+                <table id="sumOfLabels" style="display:none">
+                    <tr>
+                        <th>Passing Yards</th>
+                        <th>Passing TDs</th>
+                        <th>Interceptions</th>
+                        <th>Receptions</th>
+                        <th>Receiving Yards</th>
+                        <th>Receiving TDs</th>
+                        <th>Rushing Yards</th>
+                        <th>Rushing TDs</th>
+                    </tr>
+                    <tr>
+                        <td>0</td>
+                        <td>0</td>
+                        <td>0</td>
+                        <td>0</td>
+                        <td>0</td>
+                        <td>0</td>
+                        <td>0</td>
+                        <td>0</td>
+                    </tr>
+                </table>
+            </div>
+        <!-- Let user input player medians to be used to generate default projections in contestTableData-->
+            <button onclick="getPlayerMedians()">Get Player Medians</button>
+            <button onclick="updatePlayerMedians()">Save</button>
+            <button onclick="updateProjectionsFromMedians()">Update Projections</button>
+            <table id="playerMediansTable" class="tablesorter">
+                <thead>
+                    <th>Image</th>
+                    <th>Name</th>
+                    <th>Position</th>
+                    <th>Team</th>
+                    <th>Passing Yards</th>
+                    <th>Passing TDs</th>
+                    <th>Interceptions</th>
+                    <th>Receptions</th>
+                    <th>Receiving Yards</th>
+                    <th>Receiving TDs</th>
+                    <th>Rushing Yards</th>
+                    <th>Rushing TDs</th>
+                </thead>
+                <tbody>
+                    
+                </tbody>
+            </table>
+        </div>
+        <div id="setTeamMedians" class="tabContent" style="display:none">
+            <div class="sectionHeader">
+                <h4>Set team medians</h4>
+                <button onclick="updateTeamMedians()">Save</button>
+            </div>
+            <table id="teamMedians">
+                <thead>
+                    <th>Team</th>
+                    <th>Passing Yards</th>
+                    <th>Passing TDs</th>
+                    <th>Interceptions</th>
+                    <th>Receptions</th>
+                    <th>Receiving Yards</th>
+                    <th>Receiving TDs</th>
+                    <th>Rushing Yards</th>
+                    <th>Rushing TDs</th>
+                </thead>
+                <tbody>
+                </tbody>    
+            </table>
         <div id="footer">
         </div>
     </div>

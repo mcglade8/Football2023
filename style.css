@@ -2,6 +2,7 @@ td{
     padding: 10px;
     border: 1px solid #ccc;
     text-align: center;
+    font-weight: 700;
 
 }
 table{
@@ -118,5 +119,18 @@ h4{
     height: 100%;
     background: #eeeeee;
     color: black;
+    padding: 10px;
+}
+#playerMediansTable{
+    width: 100%;
+}
+label{
+    width: 50px;
+    float: left;
+}
+.csvSection{
+    width: 40%;
+    background: #cefff8;
+    border: 2px solid gray;
     padding: 10px;
 }

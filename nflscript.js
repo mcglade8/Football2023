@@ -5,6 +5,15 @@ var select = document.getElementById('select');
 var table = document.getElementById("contestDataTable");
 console.log("If requests fail, may need to go to https://cors-anywhere.herokuapp.com/corsdemo to re-authorize");
 async function getContestData(){
+    // Clear table of previous data
+    var table = document.getElementById("contestDataTable");
+    var rows = table.rows;
+    while(rows.length > 1){
+        table.deleteRow(-1);
+    }
+    clearSaves(); // clears local storage of saved table data
+    select.innerHTML = '<option value="All slates">All slates</option>';
+
     var contestData = [];
     // Get an array of Contests from data that we can iterate thru to get contest start times
         
@@ -28,6 +37,22 @@ async function getContestData(){
         getPlayerData(contestData);
 }
 
+function removeDuplicates(){
+    var table = document.getElementById("contestDataTable");
+    var rows = table.rows;
+    var players = [];
+    var wasRemoved = 0;
+    for(let i=1; i<rows.length; i++){
+        var r = rows[i-wasRemoved];
+        if(!players.includes(r.cells[1].innerHTML.trim())){
+            players.push(r.cells[1].innerHTML.trim());
+        }else{
+            table.deleteRow(i-wasRemoved);
+            wasRemoved++;
+        }
+    }
+}
+
 function addSelectOption(contestData){
     // Add a select so user can choose which contest start time to display in a table
     var select = document.getElementById('select');
@@ -36,7 +61,7 @@ function addSelectOption(contestData){
     for (var i = 0; i < contestData.length; i++) {
             var startTime = contestData[i]['sdstring'];
             // If start time is already in contestData, skip it. Otherwise add to startTimes
-            if (!startTimes.includes(startTime)) {
+            if (!startTimes.includes(startTime) && !contestData[i]['n'].includes("Madden") ) {
                 startTimes.push(startTime);
                 var option = document.createElement("option");
                 option.text = startTime;
@@ -52,14 +77,13 @@ async function getPlayerData(contestData){
             let selectedStartTime = o.innerHTML;
             
             let i = 0;
-            while(contestData[i]['sdstring'] != selectedStartTime){
+            while(i < contestData.length-20 &&(!'sdstring' in contestData[i] || contestData[i]['sdstring'] != selectedStartTime)&& !contestData[i]['n'].includes("Madden")){
                 i++;
             }                        
             var selectedID = contestData[i]['dg'];
             // get contest data from draftkings based on selectedID
             var newurl = "https://www.draftkings.com/lineup/getavailableplayers?contestTypeId=70&draftGroupId="+selectedID+"&gameTypeId=1&sport=NFL";
             let myPromise = new Promise(function(resolve) {
-                console.log("new pull");
                 let req = new XMLHttpRequest();
                 req.open('GET', corsAPI+newurl);
                 req.onload = function() {
@@ -84,42 +108,49 @@ async function getPlayerData(contestData){
  
 function addTableRows(playerData, selectedStartTime){
     var table = document.getElementById("contestDataTable");
+    var playersInList = [];
     
     for(let p of playerData['playerList']){
-        var row = table.insertRow(-1);
-        var cell = row.insertCell(0);
-        var img = document.createElement('img');
-        img.src = p['imgSm'];
-        cell.appendChild(img);
-        row.insertCell(1).innerHTML = p['fn'] + " " + p['ln'];
-        row.insertCell(2).innerHTML = p['pn'];
-        if(p['htid'] == p['tid']){
-            row.insertCell(3).innerHTML = p['htabbr'];
-        }else{
-            row.insertCell(3).innerHTML = p['atabbr'];
+        // If player is already in table, skip it. Otherwise add to playersInList
+        var inListName = p['fn'] + " " + p['ln'];
+        if (!playersInList.includes(inListName.trim())) {
+            playersInList.push(inListName.trim());
+            var row = table.insertRow(-1);
+            var cell = row.insertCell(0);
+            var img = document.createElement('img');
+            img.src = p['imgSm'];
+            cell.appendChild(img);
+            row.insertCell(1).innerHTML = p['fn'] + " " + p['ln'];
+            row.insertCell(2).innerHTML = p['pn'];
+            if(p['htid'] == p['tid']){
+                row.insertCell(3).innerHTML = p['htabbr'];
+            }else{
+                row.insertCell(3).innerHTML = p['atabbr'];
+            }
+            if(p['htid'] == p['tid']){
+                row.insertCell(4).innerHTML = p['atabbr'];
+            }else{
+                row.insertCell(4).innerHTML = p['htabbr'];
+            }
+            
+            row.insertCell(5).innerHTML = p['s'];
+            row.insertCell(6).innerHTML = p['pid'];
+            row.insertCell(7).innerHTML = p['ppg'];
+            row.insertCell(8).innerHTML = selectedStartTime;
+            row.insertCell(9).innerHTML = p['ppg'];
         }
-        if(p['htid'] == p['tid']){
-            row.insertCell(4).innerHTML = p['atabbr'];
-        }else{
-            row.insertCell(4).innerHTML = p['htabbr'];
-        }
-        
-        row.insertCell(5).innerHTML = p['s'];
-        row.insertCell(6).innerHTML = p['pid'];
-        row.insertCell(7).innerHTML = p['ppg'];
-        row.insertCell(8).innerHTML = selectedStartTime;
-        row.insertCell(9).innerHTML = p['ppg'];
     }
-    
 }
-    
 
 
 // Make contestDataTable sortable
 $(function() {
     //$("#contestDataTable").tablesorter(); // Not doing anything since I added my own sort function
     loadTableData();
+    removeDuplicates();
     fillTeamSelect();
+    getTeamMedians();
+    colorTableRows();
 });
 
 // Save contestDataTable data for access at a later date
@@ -132,10 +163,19 @@ function saveTableData(){
         var rowData = [];
         for (var j = 0; j < row.cells.length; j++) {
             rowData.push(row.cells[j].innerHTML);
+            if(row.cells[j].getAttribute("projections") != null){
+                rowData.push(row.cells[j].getAttribute("projections"));
+            }
         }
         tableData.push(rowData);
+
     }
+    
     localStorage.setItem("tableData", JSON.stringify(tableData));
+}
+
+function clearSaves(){
+    localStorage.removeItem("tableData");
 }
 
 // Load contestDataTable data from local storage
@@ -145,8 +185,11 @@ function loadTableData(){
     for (var i = 0; i < tableData.length; i++) {
         var row = table.insertRow(-1);
         for (var j = 0; j < tableData[i].length; j++) {
-            row.insertCell(j).innerHTML = tableData[i][j];
-            
+            if(j == 10){
+                row.cells[j-1].setAttribute("projections", tableData[i][j]);
+            }else{
+                row.insertCell(j).innerHTML = tableData[i][j];
+            }
         }
     }
     // Add select options for each contest start time in the table
@@ -219,13 +262,11 @@ function fillPlayerData(){
             }
             playerSummary.rows[3].cells[1].innerHTML += "<br>Scoring Allowed Compared to Average: " + Number(scoringEffect).toFixed(2) + "<br>Yards Allowed Compared to Average: " + Number(yardsEffect).toFixed(2);
 
-                // Highlight row that was clicked
-            var rows = table.rows;
-            for (var i = 1; i < rows.length; i++) {
-                rows[i].style.backgroundColor = "";
-            }
+            // Highlight row that was clicked
+            colorTableRows();
             this.style.backgroundColor = "yellow";
-            resetInputs();
+            this.style.color = "black";
+            resetInputs(this);
         });
     }
 }
@@ -255,12 +296,24 @@ function updateProjections(){
 }
 
 // Reset inputs to 0 when another row is clicked
-function resetInputs(){
+function resetInputs(r){
+    
     var inputs = document.getElementById("updateProjections").getElementsByTagName("input");
-    for(let i of inputs){
-        i.value = 0;
+    
+    if(r.cells[9].getAttribute("projections") != null){
+        var projections = JSON.parse(r.cells[9].getAttribute("projections"));
+        for(let i of inputs){
+            var iParent = i.parentNode;
+            var iLabel = iParent.parentElement.firstElementChild.innerHTML.replace(":", "");
+            i.value = projections[iLabel];
+        }
+    }else{
+        for(let i of inputs){
+            i.value = 0;
+        }
     }
-    document.getElementById("calcProj").innerHTML = 0;
+    //document.getElementById("calcProj").innerHTML = 0;
+    updateProjections();
 }
 
 
@@ -270,11 +323,20 @@ function newProjection(){
     var playerSummary = document.getElementById("playerSummary");
     playerSummary.rows[8].cells[1].innerHTML = proj;
 
+    // Save input values to string and store as attribute of row
+    var inputs = document.getElementById("updateProjections").getElementsByTagName("input");
+    var obj = {};
+    for(let i of inputs){
+        obj[i.id] = i.value;
+    }
+    var inputString = JSON.stringify(obj);
+
     var table = document.getElementById("contestDataTable");
     var rows = table.rows;
     for (var i = 1; i < rows.length; i++) {
         if(rows[i].style.backgroundColor == "yellow"){
             rows[i].cells[9].innerHTML = proj;
+            rows[i].cells[9].setAttribute("projections", inputString);
         }
     }
 }
@@ -283,7 +345,6 @@ function newProjection(){
 async function getDefenseProjections(){
     var url = "https://www.fantasypros.com/nfl/projections/dst.php?week=draft";
     let myPromise = new Promise(function(resolve, reject) {
-        console.log("new pull");
         let req = new XMLHttpRequest();
         req.open('GET', corsAPI+url);
         req.onload = function() {
@@ -313,7 +374,6 @@ async function getDefenseProjections(){
         var yardsAllowed = Number(rows[i].cells[8].innerHTML.replace(",", ""));
         defenseProjections.push([team, sacks, interceptions, fumblesRecovered, touchdowns, pointsAllowed, yardsAllowed]);
     }
-    console.log("defenseProjections: "+ defenseProjections);
     // Calculate means and standard deviations for each stat in defenseProjections
     var statMeans = [];
     var statSDs = [];
@@ -325,7 +385,6 @@ async function getDefenseProjections(){
         statMeans.push(average(stat));
         statSDs.push(standardDeviation(stat));
     }
-    console.log("statMeans: " + statMeans + " statSDs: " + statSDs);
     
     for(let d of defenseProjections){
         for(let i = 1; i < d.length; i++){
@@ -333,7 +392,6 @@ async function getDefenseProjections(){
         }
     }
     localStorage.setItem("defenseProjections", JSON.stringify(defenseProjections));
-    console.log(JSON.parse(localStorage.getItem("defenseProjections")));
 }
 
 // Calculate standard deviation
@@ -532,6 +590,7 @@ function sortTable(t, c){
             }
         }
     }
+    colorTableRows();
 }
 
 // Sort contestDataTable by projected points
@@ -672,49 +731,106 @@ for(let t of tables){
 // Passing TDs range from 15-40
 
 // run buildLineups() in a loop but don't start over until all data is loaded
-async function iterateBuild(type, built = 0){
+async function iterateBuild(type){
     var lineupsToBuild = Number(document.getElementById("lineupsToBuild").value);
-
+    var allLineups = "";
     if(type=="Classic"){
-        let promise = new Promise(function(resolve) {
-            setTimeout(resolve(buildLineups()), 500);
-        });
-
-        promise.then(function() {
-            built++;
-            if(built < lineupsToBuild){
-                iterateBuild(type, built);
-            }
-        });
+        for(let i = 0; i < lineupsToBuild; i++){
+            allLineups += '<tr>' + buildLineups() +' </tr>';
+        }
+        document.getElementById("lineupTable").innerHTML = allLineups;
     }else{
         buildShowdownLineups();
         built++;
         if(built < lineupsToBuild){
-            setTimeout(function(){iterateBuild(type, built)}, 500);
+            iterateBuild(type, built);
         }
     }
 }
+
+// Give user feedback while lineups are building
+function buildLineupsFeedback(built, lineupsToBuild){
+    var buildingLineups = document.getElementById("buildingLineups");
+    buildingLineups.style = "display: block; z-index: 1; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255,255,255,0.8);";
+    var lineupProgress = document.getElementById("lineupProgress");
+    lineupProgress.innerHTML = "Building lineup " + built + " of " + lineupsToBuild;
+}
+
+// Remove previously built lineups onload
+localStorage.lineups = "";
 
 // Solve a draftkings lineup for a given contest start time
 function buildLineups(){
         var contestDataTable = document.getElementById("contestDataTable");
         var contestTime = document.getElementById("select").value;
-        var players = [];
-        var variance = Number(document.getElementById("varianceValue").innerHTML.trim());
-        for(let r of contestDataTable.rows){
-            if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position")){
-                var player = {name: r.cells[1].innerHTML, id: r.cells[6].innerHTML, position: r.cells[2].innerHTML, team: r.cells[3].innerHTML, opponent: r.cells[4].innerHTML, salary: r.cells[5].innerHTML, proj: (Number(r.cells[9].innerHTML)+variance*(Math.random()-.5)).toFixed(1)};
-                players.push(player);
+        var lineupsToBuild = Number(document.getElementById("lineupsToBuild").value);
+        for(let i = 0; i < lineupsToBuild; i++){
+            var players = [];
+            for(let r of contestDataTable.rows){
+                if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position")){
+                    var player = {name: r.cells[1].innerHTML, id: r.cells[6].innerHTML, position: r.cells[2].innerHTML, team: r.cells[3].innerHTML, opponent: r.cells[4].innerHTML, salary: r.cells[5].innerHTML, proj: randomizeProjection(r.cells[9].innerHTML, r.cells[2].innerHTML)};
+                    players.push(player);
+                }
             }
+            players = correlateByTeam(players);
+            let promise = new Promise(function(resolve) {
+                optimizeClassic(players);
+                resolve();
+            });
+            promise.then(function(){
+                document.getElementById("lineupTable").lastElementChild.innerHTML = localStorage.lineups;
+            });
         }
-        players = correlateByTeam(players);
-        optimizeClassic(players);
-    
 }
+
+// Randomize projection
+function randomizeProjection(proj, position){
+    var variance = Number(document.getElementById("varianceValue").innerHTML.trim());
+
+    // curveLean is how much the curve leans away from the mean; 
+    // under .5 means it leans right, over .5 means it leans left
+    var curveLean = 0;
+
+    // varianceStrength is how much variance affects the projections
+    var varianceStrength = 0;
+
+    // random number between 0 and 1
+    var rand = Math.random();
+
+    switch(position){
+        case "QB":
+            curveLean = 0.38;
+            varianceStrength = 1.2;
+            break;
+        case "RB":
+            curveLean = .63;
+            varianceStrength = 1.4;
+            break;
+        case "WR":
+            curveLean = .75;
+            varianceStrength = 1.9;
+            break;
+        case "TE":
+            curveLean = .75;
+            varianceStrength = 1.5;
+            break;
+        case "DST":
+            curveLean = .68;
+            varianceStrength = .6;
+            break;
+    }
+
+    var thisProj = Number(proj);
+    variance = (variance*varianceStrength+thisProj*.25)*(rand-curveLean); // variance is higher for higher projections; manipulated by randomness and curveLean
+    if(thisProj <= 0) return 0;
+    return (thisProj+variance).toFixed(1);
+}
+
 
 // Solve a DraftKings classic lineup for a given contest start time
 // Solver from https://github.com/JWally/jsLPSolver
 function optimizeClassic(players){
+    
     //var lineup = [];
     //var positions = ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "DST"];
     var salaryCap = 50000;
@@ -725,19 +841,21 @@ function optimizeClassic(players){
     var FLEXs = [];
     var DSTs = [];
     for(let p of players){
-        if(p.position == "QB"){
-            QBs.push(p);
-        }else if(p.position == "RB"){
-            RBs.push(p);
-            FLEXs.push(p);
-        }else if(p.position == "WR"){
-            WRs.push(p);
-            FLEXs.push(p);
-        }else if(p.position == "TE"){
-            TEs.push(p);
-            FLEXs.push(p);
-        }else if(p.position == "DST"){
-            DSTs.push(p);
+        if(p.proj > 0){
+            if(p.position == "QB"){
+                QBs.push(p);
+            }else if(p.position == "RB"){
+                RBs.push(p);
+                FLEXs.push(p);
+            }else if(p.position == "WR"){
+                WRs.push(p);
+                FLEXs.push(p);
+            }else if(p.position == "TE"){
+                TEs.push(p);
+                FLEXs.push(p);
+            }else if(p.position == "DST"){
+                DSTs.push(p);
+            }
         }
     }
     var modelVariables = {};
@@ -766,8 +884,6 @@ function optimizeClassic(players){
         modelVariables[p.name] = {"id": p.id,"proj": p.proj, "salary": p.salary, "DST": 1, "i": 1};
         modelVariables[p.name][pid] = 1;
     }
-
-
     var results;
     require(['solver'], function(solver) {
         var model = {
@@ -791,21 +907,19 @@ function optimizeClassic(players){
             model.constraints[p.id] = {"max": 1};
             model.ints[p.name] = 1;
         }
-        //console.log(solver);
-        //console.log(model);
-        results = solver.Solve(model);
+        results = solver.Solve(model); // this line is what's taking so long; I have a feeling it's weird stuff happening with variables
         addLineup(results, players);
     });
 
-    //return results;
-    
-    
 }
 
 // Add lineup to lineupTable - classic
 function addLineup(lineup,players){
-    var lineupTable = document.getElementById("lineupTable");
-    var row = lineupTable.insertRow(-1);
+
+    //var lineupTable = document.getElementById("lineupTable");
+    //var row = lineupTable.insertRow(-1);
+    var row = document.createElement('tr');
+
     var lineupForTable = [];
     for(let k of Object.keys(lineup)){
         if(k != "feasible" && k != "result" && k != "bounded" && k != "iterations" && k != "time" && k != "dual" && k != "primal" && k != "isIntegral"){
@@ -840,6 +954,8 @@ function addLineup(lineup,players){
         }
     }
     var orderedLineup = [];
+    
+
     for(let p of QBs){
         orderedLineup.push(p);
     }
@@ -858,11 +974,20 @@ function addLineup(lineup,players){
     for(let p of DSTs){
         orderedLineup.push(p);
     }
-
+    var totalSalary = 0;
+    var totalProj = 0;
     for(let p of orderedLineup){
         var cell = row.insertCell(-1);
         cell.innerHTML = p.name + "<br>" + p.team + "<br>" + p.salary + "<br>" + p.proj;
+        totalSalary += Number(p.salary);
+        totalProj += Number(p.proj);
     }
+    row.insertCell(-1).innerHTML = totalSalary;
+    row.insertCell(-1).innerHTML = totalProj.toFixed(1);
+    //return row.innerHTML;
+    if(localStorage.lineups){
+        localStorage.lineups +="<tr>" + row.innerHTML + "</tr>";
+    } else localStorage.lineups = "<tr>" + row.innerHTML + "</tr>";
 }
 
 
@@ -897,18 +1022,25 @@ function buildShowdownLineups(){
     
         var contestDataTable = document.getElementById("contestDataTable");
         var contestTime = document.getElementById("select").value;
+        var lineupsToBuild = Number(document.getElementById("lineupsToBuild").value);
+        for(let i = 0; i < lineupsToBuild; i++){
         var players = [];
-        var variance = Number(document.getElementById("varianceValue").innerHTML.trim());
 
         for(let r of contestDataTable.rows){
             if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position")){
-                var player = {name: r.cells[1].innerHTML, id: r.cells[6].innerHTML, position: r.cells[2].innerHTML, team: r.cells[3].innerHTML, opponent: r.cells[4].innerHTML, salary: r.cells[5].innerHTML, proj: (Number(r.cells[9].innerHTML)+variance*(Math.random()-.5)).toFixed(1)};
+                var player = {name: r.cells[1].innerHTML, id: r.cells[6].innerHTML, position: r.cells[2].innerHTML, team: r.cells[3].innerHTML, opponent: r.cells[4].innerHTML, salary: r.cells[5].innerHTML, proj: randomizeProjection(r.cells[9].innerHTML, r.cells[2].innerHTML)};
                 players.push(player);
             }
         }
         players = correlateByTeam(players);
-        optimizeShowdown(players);
-    
+        let promise = new Promise(function(resolve) {
+            optimizeShowdown(players);
+            resolve();
+        });
+        promise.then(function(){
+            document.getElementById("showdownLineupTable").lastElementChild.innerHTML = localStorage.lineups;
+        });
+    }   
 }
 
 // Manipulate projections to correlate by team
@@ -922,27 +1054,29 @@ function correlateByTeam(players){
     for(let p of players){
         switch(p.position){
             case "QB":
-                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * 0.8)).toFixed(1);
+                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * .24+teamProjections[p.opponent].correlate * .1)).toFixed(1);
                 break;
             case "RB":
-                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * 0.6)).toFixed(1);
+                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * .12-teamProjections[p.opponent].correlate * .1)).toFixed(1);
                 break;
             case "WR":
-                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * 0.4)).toFixed(1);
+                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * .36+teamProjections[p.opponent].correlate * .1)).toFixed(1);
                 break;
             case "TE":
-                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * 0.2)).toFixed(1);
+                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * .18)).toFixed(1);
                 break;
             case "DST":
-                p.proj = (p.proj * (1 + teamProjections[p.opponent].correlate * 0.9)).toFixed(1);
+                p.proj = (p.proj * (1 - teamProjections[p.opponent].correlate * 0.814 + teamProjections[p.team].correlate * .25)).toFixed(1);
                 break;
         }
+        if(p.proj <= 0) p.proj = 0;
     }
     return players;
 }
 
 // Solve a DraftKings showdown lineup for a given contest start time
 function optimizeShowdown(players){
+    //setTimeout(function(){return;}, 1000);
     var modelVariables = {};
     for(let p of players){
         let pid = p.id;
@@ -977,16 +1111,16 @@ function optimizeShowdown(players){
             model.ints[p.name] = 1;
             model.ints["CPT "+p.name] = 1;
         }
-        //console.log(solver);
-        //console.log(model);
+
         results = solver.Solve(model);
-        addLineupShowdown(results, players);
+        setTimeout(addLineupShowdown(results, players), 100);
     });
 }
 
 // Add lineup to showdownLineupTable
 function addLineupShowdown(lineup,players){
-    console.log(lineup);
+    //setTimeout(function(){return;}, 1000);
+
     var lineupTable = document.getElementById("showdownLineupTable");
     var row = lineupTable.insertRow(-1);
     var lineupForTable = [];
@@ -1011,13 +1145,16 @@ function addLineupShowdown(lineup,players){
     // order lineupForTable by position
     var cpts = [];
     var flexs = [];
-    console.log(lineupForTable);
+    var totalProj =0;
+    var totalSalary = 0;
     for(let p of lineupForTable){
         if(p.name.includes("CPT")){
             cpts.push(p);
         }else{
             flexs.push(p);
         }
+        totalProj += Number(p.proj);
+        totalSalary += Number(p.salary);
     }
 
     var orderedLineup = [];
@@ -1032,6 +1169,8 @@ function addLineupShowdown(lineup,players){
         var cell = row.insertCell(-1);
         cell.innerHTML = p.name + "<br>" + p.team + "<br>" + p.salary + "<br>" + Number(p.proj).toFixed(1);
     }
+    row.insertCell(-1).innerHTML = totalSalary;
+    row.insertCell(-1).innerHTML = totalProj.toFixed(1);
 }
 
 // Add variance to lineup builder based on slider value
@@ -1045,4 +1184,442 @@ function updateSlider(){
 function updateOtherSelect(){
     var otherSelect = document.getElementById("select2").value;
     document.getElementById("select").value = otherSelect;
+}
+
+// Get player medians from storage, if it exists
+function getPlayerMedians(){
+    var table = document.getElementById("playerMediansTable");
+    var players = document.getElementById("contestDataTable").rows;
+    var playerMedians = {};
+    if(localStorage.playerMedians){
+        playerMedians = JSON.parse(localStorage.playerMedians);
+    }else{
+        playerMedians = {};
+    }
+    var ths = table.getElementsByTagName("th");
+    var teams = [];
+    for(let p of players){
+        if(!teams.includes(p.cells[3].innerHTML.trim()) && p.cells[1].innerHTML != "Player"){
+            teams.push(p.cells[3].innerHTML.trim());
+        }
+        if(p.cells[1].innerHTML != "Player"){
+            var name = p.cells[1].innerHTML;
+            if(name in playerMedians){
+                var row = table.insertRow(-1);
+                for(let t of ths){
+                    if(["Image", "Name", "Position", "Team"].includes(t.innerHTML)) {
+                        var cell = row.insertCell(-1);
+                        cell.innerHTML = p.cells[t.cellIndex].innerHTML;
+                    }else{
+                        var cell = row.insertCell(-1);
+                        cell.innerHTML = '<label for="'+name+t.innerHTML+'Slider">'+playerMedians[name][t.innerHTML]+'</label><input type="range" min="0" max="100" value="'+playerMedians[name][t.innerHTML]+'" class="slider" id="'+name+t.innerHTML+'Slider" oninput="updateProjectionSlider(this.id)">';
+                    }   
+                }
+            } else{
+                var row = table.insertRow(-1);
+                for(let t of ths){
+                    if(["Image", "Name", "Position", "Team"].includes(t.innerHTML)) {
+                        var cell = row.insertCell(-1);
+                        cell.innerHTML = p.cells[t.cellIndex].innerHTML;
+                    }else{
+                        var cell = row.insertCell(-1);
+                        cell.innerHTML = '<label for="'+name+t.innerHTML+'Slider">0</label><input type="range" min="0" max="100" value="0" class="slider" id="'+name+t.innerHTML+'Slider" oninput="updateProjectionSlider(this.id)">';
+                    }
+                }
+            }
+
+        }
+    }
+    var teamSelect = document.getElementById("teamSelectMedians");
+    for(let t of teams){
+        var option = document.createElement("option");
+        option.text = t;
+        teamSelect.add(option);
+    }
+}
+
+// Update player medians in storage
+function updatePlayerMedians(){
+    var table = document.getElementById("playerMediansTable");
+    var rows = table.rows;
+    var playerMedians = {};
+    for(let r of rows){
+        if(r.rowIndex == 0) continue;
+        var name = r.cells[1].innerHTML;
+        playerMedians[name] = {};
+        var ths = table.getElementsByTagName("th");
+        for(let t of ths){
+            if(["Image", "Name", "Position", "Team"].includes(t.innerHTML)) continue;
+            var slider = document.getElementById(name+t.innerHTML+"Slider");
+            playerMedians[name][t.innerHTML] = slider.value;
+        }
+    }
+    localStorage.playerMedians = JSON.stringify(playerMedians);
+}
+
+// Update feedback for slider input
+function updateProjectionSlider(id){
+    var slider = document.getElementById(id);
+    var label = slider.previousElementSibling;
+    label.innerHTML = slider.value;
+    populateSumOfLabels()
+}
+
+function filterTeamsMedians(){
+    var table = document.getElementById("playerMediansTable");
+    var rows = table.rows;
+    var team = document.getElementById("teamSelectMedians").value;
+    for(let r of rows){
+        if(r.rowIndex == 0) continue;
+        if(r.cells[3].innerHTML.trim() == team || team == "All"){
+            r.style.display = "";
+        }else{
+            r.style.display = "none";
+        }
+    }
+    
+    populateSumOfLabels();
+}
+
+// Populate sum of labels in player medians table
+function populateSumOfLabels(){
+    var sumOfLabels = document.getElementById("sumOfLabels");
+    sumOfLabels.style.display = "";
+    var table = document.getElementById("playerMediansTable");
+    var rows = table.rows;
+    var sums = [0,0,0,0,0,0,0,0];
+    for(let r of rows){
+        if(r.rowIndex == 0) continue;
+        if(r.style.display != "none"){
+            var ths = table.getElementsByTagName("th");
+            for(let t of ths){
+                if(["Image", "Name", "Position", "Team"].includes(t.innerHTML)) continue;
+                var slider = document.getElementById(r.cells[1].innerHTML+t.innerHTML+"Slider");
+                sums[t.cellIndex-4] += Number(slider.value);
+            }
+        }
+    }
+    var solData = sumOfLabels.rows[1].cells;
+    for(let i = 0; i < sums.length; i++){
+        solData[i].innerHTML = sums[i];
+    }
+}
+// Get team medians
+function getTeamMedians(){
+    var table = document.getElementById("teamMedians");
+    var players = document.getElementById("contestDataTable").rows;
+    var teamMedians = {};
+    if(localStorage.teamMedians){
+        teamMedians = JSON.parse(localStorage.teamMedians);
+    }else{
+        teamMedians = {};
+    }
+    var ths = table.getElementsByTagName("th");
+    var teams = [];
+    for(let p of players){
+        if(!teams.includes(p.cells[3].innerHTML.trim()) && p.cells[1].innerHTML != "Team"){
+            teams.push(p.cells[3].innerHTML.trim());
+        }
+    }
+    for(let t of teams){
+        if(t in teamMedians){
+            var row = table.insertRow(-1);
+            for(let th of ths){
+                if(th.innerHTML == "Team"){
+                    var cell = row.insertCell(-1);
+                    cell.innerHTML = t;
+                }else{
+                    var cell = row.insertCell(-1);
+                    cell.innerHTML = '<input type="number" value="'+teamMedians[t][th.innerHTML]+'" class="slider" id="'+t+th.innerHTML+'Proj">';
+                }
+            }
+        }else{
+            var row = table.insertRow(-1);
+            for(let th of ths){
+                if(th.innerHTML == "Team"){
+                    var cell = row.insertCell(-1);
+                    cell.innerHTML = t;
+                }else{
+                    var cell = row.insertCell(-1);
+                    cell.innerHTML = '<input type="number" value="0" class="slider" id="'+t+th.innerHTML+'Proj">';
+                }
+            }
+        }
+    }
+}
+
+// Update team medians in storage
+function updateTeamMedians(){
+    var table = document.getElementById("teamMedians");
+    var rows = table.rows;
+    var teamMedians = {};
+    for(let r of rows){
+        if(r.rowIndex == 0) continue;
+        var team = r.cells[0].innerHTML;
+        teamMedians[team] = {};
+        var ths = table.getElementsByTagName("th");
+        for(let t of ths){
+            if(t.innerHTML == "Team") continue;
+            var input = document.getElementById(team+t.innerHTML+"Proj");
+            teamMedians[team][t.innerHTML] = input.value;
+        }
+    }
+    localStorage.teamMedians = JSON.stringify(teamMedians);
+}
+
+// Update player projections within Contest Info based on team medians and player medians
+function updateProjectionsFromMedians(){
+    var players = document.getElementById("contestDataTable");
+    var rows = players.rows;
+    var teamMedians = JSON.parse(localStorage.teamMedians);
+    var playerMedians = JSON.parse(localStorage.playerMedians);
+    var ths = document.getElementById('teamMedians').getElementsByTagName('th');
+    var categories = [];
+    for(let th of ths){
+        if(th.innerHTML == "Team") continue;
+        categories.push(th.innerHTML);
+    }
+    for(let r of rows){
+        if(r.rowIndex == 0) continue;
+        var team = r.cells[3].innerHTML.trim();
+        var player = r.cells[1].innerHTML.trim();
+        if(player in playerMedians){
+            var playerProjections = playerMedians[player];
+            var teamProjections = teamMedians[team];
+            var newProjections = {};
+            for(let c of categories){
+                newProjections[c] = Number(playerProjections[c]) * Number(teamProjections[c])/100;
+            }
+            r.cells[9].setAttribute("projections", JSON.stringify(newProjections));
+            r.cells[9].innerHTML = ((newProjections["Passing Yards"] * 0.04) + (newProjections["Passing TDs"] * 4) + (newProjections["Interceptions"] * -1) + (newProjections["Rushing Yards"] * 0.1) + (newProjections["Rushing TDs"] * 6) + (newProjections["Receptions"] * 1) + (newProjections["Receiving Yards"] * 0.1) + (newProjections["Receiving TDs"] * 6)).toFixed(1);
+        }
+    }
+}
+
+function handlecsv(){
+    var csv = document.getElementById("contestcsv").files[0];
+    var reader = new FileReader();
+    // save csv to storage as JSON
+    reader.onload = function(e){
+        var csv = e.target.result;
+        var lines = csv.split("\n");
+        var result = [];
+        var headers = lines[0].split(",");
+        for(let i = 1; i < lines.length; i++){
+            var obj = {};
+            var currentline = lines[i].split(",");
+            for(let j = 0; j < headers.length; j++){
+                obj[headers[j]] = currentline[j];
+            }
+            result.push(obj);
+        }
+        localStorage.contestData = JSON.stringify(result);
+        //location.reload();
+    }
+    reader.readAsText(csv);
+
+}
+
+
+// Download lineups from builder as CSV 
+function downloadLineupsShowdown(){
+    var lineups = document.getElementById("showdownLineupTable").rows;
+    var csv = "data:text/csv;charset=utf-8,";
+    csv += "CPT,FLEX,FLEX,FLEX,FLEX,FLEX\n";
+    for(let l of lineups){
+        if(l.rowIndex == 0) continue;
+        var row = [];
+        for(let c of l.cells){
+            if(c.cellIndex > 5) continue;
+            var cell = c.innerHTML;
+            var position = "FLEX";
+            if(c.cellIndex == 0){
+                position = "CPT";
+            }
+            var name = cell.split("<br>")[0].replace("CPT ", "").trim();
+            console.log(name);
+            row.push(getIdFromUpload(name, position));
+        }
+        csv += row.join(",") + "\n";
+    }
+    var encodedUri = encodeURI(csv);
+    var link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "lineups.csv");
+    document.body.appendChild(link);
+    link.click();
+}
+
+// Get player ID from upload based on name and position
+function getIdFromUpload(name, position){
+    var upload = JSON.parse(localStorage.contestData);
+    for(let p of upload){
+        if(p["Name"].includes(name) && p["Roster Position"].includes(position)){
+            return p["ID"];
+        }
+    }
+}
+
+// Place DKEntries into localStorage for use in builder
+function handleLineupscsv(){
+    var csv = document.getElementById("editcsv").files[0];
+    var reader = new FileReader();
+    // save csv to storage as JSON
+    reader.onload = function(e){
+        var csv = e.target.result;
+        var lines = csv.split("\n");
+        var result = [];
+        var headers = lines[0].split(",");
+        for(let i = 0; i < lines.length; i++){
+            var obj = [];
+            var currentline = lines[i].split(",");
+            for(let j = 0; j < headers.length; j++){
+                obj[j] = currentline[j];
+            }
+            result.push(obj);
+        }
+        localStorage.DKEntries = JSON.stringify(result);
+        //location.reload();
+    }
+    reader.readAsText(csv);
+
+}
+
+function downloadEditedLineupsShowdown(){
+    var lineups = document.getElementById("showdownLineupTable").rows;
+    var csv = "data:text/csv;charset=utf-8,";
+    var previousLineups = JSON.parse(localStorage.DKEntries);
+    
+    for(let l of lineups){
+        if(l.rowIndex == 0) continue;
+        var row = [];
+        for(let c of l.cells){
+            if(c.cellIndex > 5) continue;
+            var cell = c.innerHTML;
+            var position = "FLEX";
+            if(c.cellIndex == 0){
+                position = "CPT";
+            }
+            var name = cell.split("<br>")[0].replace("CPT ", "").trim();
+            row.push(getIdFromUpload(name, position));
+        }
+        var index = l.rowIndex;
+        if(index > previousLineups.length) index = previousLineups.length;
+        for(let i = 0; i < row.length; i++){
+            previousLineups[index][i+4] = row[i];
+        }
+    }
+    //console.log(previousLineups);
+    for(let l of previousLineups){
+        csv += l.join(",") + "\n";
+    }
+    //csv += previousLineups.join("\n");
+    var encodedUri = encodeURI(csv);
+
+    var link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "lineups.csv");
+    document.body.appendChild(link);
+    link.click();
+}
+
+// Get primary color for team based on abbreviation
+function getPrimaryColor(team){
+    var primaryColors = {
+        "ARI": "#97233F",
+        "ATL": "#A71930",
+        "BAL": "#241773",
+        "BUF": "#00338D",
+        "CAR": "#0085CA",
+        "CHI": "#0B162A",
+        "CIN": "#FB4F14",
+        "CLE": "#311D00",
+        "DAL": "#041E42",
+        "DEN": "#002244",
+        "DET": "#0076B6",
+        "GB": "#203731",
+        "HOU": "#03202F",
+        "IND": "#002C5F",
+        "JAX": "#006778",
+        "KC": "#E31837",
+        "LAC": "#002A5E",
+        "LAR": "#002244",
+        "MIA": "#008E97",
+        "MIN": "#4F2683",
+        "NE": "#002244",
+        "NO": "#D3BC8D",
+        "NYG": "#0B2265",
+        "NYJ": "#125740",
+        "LV": "#A5ACAF",
+        "PHI": "#004C54",
+        "PIT": "#FFB612",
+        "SEA": "#002244",
+        "SF": "#AA0000",
+        "TB": "#D50A0A",
+        "TEN": "#0C2340",
+        "WAS": "#773141"
+    };
+    return primaryColors[team];
+}
+
+function getSecondaryColor(team){
+    var secondaryColors = {
+        "ARI": "#FFFFFF",
+        "ATL": "#FFFFFF",
+        "BAL": "#FFFFFF",
+        "BUF": "#FFFFFF",
+        "CAR": "#101820",
+        "CHI": "#FFFFFF",
+        "CIN": "#000000",
+        "CLE": "#FF3C00",
+        "DAL": "#869397",
+        "DEN": "#FB4F14",
+        "DET": "#FFFFFF",
+        "GB": "#FFB612",
+        "HOU": "#FFFFFF",
+        "IND": "#FFFFFF",
+        "JAX": "#FFFFFF",
+        "KC": "#FFFFFF",
+        "LAC": "#FFC20E",
+        "LAR": "#FFFFFF",
+        "MIA": "#F58220",
+        "MIN": "#FFC62F",
+        "NE": "#C60C30",
+        "NO": "#101820",
+        "NYG": "#FFFFFF",
+        "NYJ": "#FFFFFF",
+        "LV": "#000000",
+        "PHI": "#A5ACAF",
+        "PIT": "#101820",
+        "SEA": "#69BE28",
+        "SF": "#FFFFFF",
+        "TB": "#FFFFFF",
+        "TEN": "#FFFFFF",
+        "WAS": "#FFB612"
+    };
+    return secondaryColors[team];
+}
+
+// Color table rows based on team
+function colorTableRows(){  
+    var t = document.getElementById("contestDataTable");
+    //var allTables = document.getElementsByTagName("table"); // This works, but is disorienting on some tables
+    //for(let t of allTables){
+        // find header "Team"
+        var ths = t.getElementsByTagName("th");
+        var teamIndex = 0;
+        for(let th of ths){
+            if(th.innerHTML == "Team"){
+                teamIndex = th.cellIndex;
+            }
+        }
+
+        var rows = t.rows;
+        for(let r of rows){
+            if(r.rowIndex == 0) continue;
+            var team = r.cells[teamIndex].innerHTML.trim();
+            r.style.backgroundColor = getPrimaryColor(team);
+            r.style.color = getSecondaryColor(team);
+        }
+    //}
 }
