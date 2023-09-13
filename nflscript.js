@@ -35,6 +35,7 @@ async function getContestData(){
         contestData = JSON.parse(data).Contests; 
         addSelectOption(contestData);
         getPlayerData(contestData);
+        setDefenseProjections();
 }
 
 function removeDuplicates(){
@@ -151,6 +152,7 @@ $(function() {
     fillTeamSelect();
     getTeamMedians();
     colorTableRows();
+    setDefenseProjections();
 });
 
 // Save contestDataTable data for access at a later date
@@ -343,7 +345,7 @@ function newProjection(){
 
 // Scrape defense points allowed projections from fantasypros.com
 async function getDefenseProjections(){
-    var url = "https://www.fantasypros.com/nfl/projections/dst.php?week=draft";
+    var url = "https://www.fantasypros.com/nfl/projections/dst.php?week=2";
     let myPromise = new Promise(function(resolve, reject) {
         let req = new XMLHttpRequest();
         req.open('GET', corsAPI+url);
@@ -392,6 +394,7 @@ async function getDefenseProjections(){
         }
     }
     localStorage.setItem("defenseProjections", JSON.stringify(defenseProjections));
+    setDefenseProjections();
 }
 
 // Calculate standard deviation
@@ -1079,6 +1082,7 @@ function optimizeShowdown(players){
     //setTimeout(function(){return;}, 1000);
     var modelVariables = {};
     for(let p of players){
+        if(p.proj <= 0) continue;
         let pid = p.id;
         let pteam = p.team;
         modelVariables[p.name] = {"proj": p.proj, "salary": p.salary, "i": 1, "CPT": 0};
@@ -1622,4 +1626,32 @@ function colorTableRows(){
             r.style.color = getSecondaryColor(team);
         }
     //}
+}
+
+// Set defense projections based on defensesTable data; setting K data by this as well
+function setDefenseProjections(){
+    var defensesTable = document.getElementById("defensesTable");
+    var rows = defensesTable.rows;
+    var defenses = {};
+    for(let r of rows){
+        if(r.rowIndex == 0) continue;
+        var team = r.cells[1].innerHTML.trim();
+        var sacks = r.cells[2].innerHTML.trim();
+        var interceptions = r.cells[3].innerHTML.trim();
+        var fumbles = r.cells[4].innerHTML.trim();
+        var touchdowns = r.cells[5].innerHTML.trim();
+        var pointsAllowed = r.cells[6].innerHTML.trim();
+        var proj = ((Number(sacks) + Number(interceptions) *2 + Number(fumbles) * 2 + Number(touchdowns) * .6 + Number(pointsAllowed) * -1 + 13)/2).toFixed(1);
+
+        defenses[team] = proj;
+    }
+    var players = document.getElementById("contestDataTable").rows;
+    for(let p of players){
+        if(p.cells[2].innerHTML == "DST"){
+            p.cells[9].innerHTML = defenses[p.cells[3].innerHTML.trim()];
+        }
+        if(p.cells[2].innerHTML == "K"){
+            p.cells[9].innerHTML = ((Number(defenses[p.cells[3].innerHTML.trim()]) - Number(defenses[p.cells[4].innerHTML.trim()]))/5+7.5).toFixed(1);
+        }
+    }
 }
