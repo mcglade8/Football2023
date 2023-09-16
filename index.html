@@ -22,13 +22,16 @@
             <button id="builderInfo" class="tabButton">Builder</button>
             <button id="setPlayerMediansInfo" class="tabButton">Set Player Medians</button>
             <button id="setTeamMediansInfo" class="tabButton">Set Team Medians</button>
+            <button id="injuriesInfo" class="tabButton">Injury Info</button>
         </div>
         <div id="contest" class="contestDiv tabContent" style="display:block;width:100%">
             <div id="mainTableSection" class="splitScreen">
                 <div id="tableController">
                     <table>
-                        <td><button id="getPlayerData" onclick="getContestData()">Scrape Contest Data</button></td>
-                        <td><button id="saveTableData" onclick="saveTableData()">Save Table Data</button></td>
+                        <td><button id="getPlayerData" onclick="getContestData()">Scrape Data</button></td>
+                        <td><button id="updatePlayerData" onclick="updateContestData()">Update from Storage</button></td>
+                        <!-- Deprecating and instead running functions on load due to increased data load  exceeding localStorage quota -->
+                        <!-- <td><button id="saveTableData" onclick="saveTableData()">Save Table Data</button></td> -->
                         <td><button id="loadTableData" onclick="loadTableData()">Load Table Data</button></td>
                         <td><select id="select" onchange="getPositionProjections()"><option value="All slates">All slates</option></select></td>
                         <td><select id="positionSelect" onchange="getPositionProjections()">
@@ -207,11 +210,11 @@
                 <!-- Have user upload .csv of contest info they want to build for -->
                 <div class="csvSection">
                     <label style="float:none" for="contestcsv">Import salaries: </label><input type="file" name="contestcsv" id="contestcsv" oninput="handlecsv()">
-                    <button onclick="downloadLineupsShowdown()">Download Lineups for Initial Upload</button>
+                    <button onclick="downloadLineupsShowdown()" style="display:none" class="downloadLineupsButton">Download Lineups for Initial Upload</button><button onclick="downloadLineups()" class="downloadLineupsButton">Download Lineups for Initial Upload</button>
                 </div>
                 <div class="csvSection">
                     <label style="float:none" for="editcsv">Lineups for edit: </label><input type="file" name="editcsv" id="editcsv" oninput="handleLineupscsv()">
-                    <button onclick="downloadEditedLineupsShowdown()">Download Edited Lineups</button>
+                    <button onclick="downloadEditedLineupsShowdown()" style="display:none" class="downloadLineupsButton">Download Edited Lineups</button><button onclick="downloadEditedLineups()" class="downloadLineupsButton">Download Edited Lineups</button>
                 </div>
             </div>
             <div id="Classic" class="builderSection">
@@ -281,10 +284,15 @@
                     </tr>
                 </table>
             </div>
+            <div class="sectionHeader">
         <!-- Let user input player medians to be used to generate default projections in contestTableData-->
             <button onclick="getPlayerMedians()">Get Player Medians</button>
             <button onclick="updatePlayerMedians()">Save</button>
             <button onclick="updateProjectionsFromMedians()">Update Projections</button>
+            
+                <h4>If data does not preload, upload here</h4>
+                <label style="width:auto" for="playerMedians">Upload From File:</label><input type="file" name="playerMedians" id="playerMedians" oninput="handleTXT('playerMedians')">
+            </div>
             <table id="playerMediansTable" class="tablesorter">
                 <thead>
                     <th>Image</th>
@@ -309,8 +317,12 @@
             <div class="sectionHeader">
                 <h4>Set team medians</h4>
                 <button onclick="updateTeamMedians()">Save</button>
+                <div style="margin-top:10px">
+                    <h4>If data does not preload, upload here</h4>
+                    <label style="width:auto" for="teamMedians">Upload From File:</label><input type="file" name="teamMedians" id="teamMedians" oninput="handleTXT('teamMedians')">
+                </div>
             </div>
-            <table id="teamMedians">
+            <table id="teamMediansTable">
                 <thead>
                     <th>Team</th>
                     <th>Passing Yards</th>
@@ -325,7 +337,27 @@
                 <tbody>
                 </tbody>    
             </table>
-        <div id="footer">
+        </div>
+        <div id="injuries" class="tabContent" style="display:none">
+            <div class="sectionHeader">
+                <h4>Injury Data</h4>
+            </div>
+            <button onclick="addInjured()">Add row</button>
+            <button onclick="reloadPage()">Save</button>
+            <button onclick="clearInjuries()">Clear</button>
+            <table id="injuryTable" class="tablesorter">
+                <thead>
+                    <th>Injured</th>
+                    <th>Beneficiary 1 | Percent</th>
+                    <th>Beneficiary 2 | Percent</th>
+                    <th>Beneficiary 3 | Percent</th>
+                    <th>Beneficiary 4 | Percent</th>
+                    <th>Beneficiary 5 | Percent</th>
+                </thead>
+                <tbody>
+                    
+                </tbody>
+            </table>
         </div>
     </div>
     <script type="text/javascript" src="nflscript.js"></script>
