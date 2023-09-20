@@ -25,14 +25,24 @@
             <button id="injuriesInfo" class="tabButton">Injury Info</button>
         </div>
         <div id="contest" class="contestDiv tabContent" style="display:block;width:100%">
+            <div class="sectionHeader">
+                <h3>Contest Data</h3>
+                <h4>To add a contest, select the date and enter a name for the contest, then upload the .csv from Draftkings.<br>The page will refresh and the content will update.</h4>
+            </div>
             <div id="mainTableSection" class="splitScreen">
                 <div id="tableController">
                     <table>
-                        <td><button id="getPlayerData" onclick="getContestData()">Scrape Data</button></td>
-                        <td><button id="updatePlayerData" onclick="updateContestData()">Update from Storage</button></td>
+                        <!--<td><button id="getPlayerData" onclick="getContestData()">Scrape Data</button></td>-->
+                        <td>
+                            Date of contest: <input type="date" id="contestDate">
+                            <br>Name of contest: <input type="text" id="contestName">
+                            <br>CSV: <input type="file" id="dksalaries">
+                        </td>
+                        <!-- All of these are deprecated now - data will pull from JSON files -->
+                        <!--<td><button id="updatePlayerData" onclick="updateContestData()">Update from Storage</button></td>-->
                         <!-- Deprecating and instead running functions on load due to increased data load  exceeding localStorage quota -->
                         <!-- <td><button id="saveTableData" onclick="saveTableData()">Save Table Data</button></td> -->
-                        <td><button id="loadTableData" onclick="loadTableData()">Load Table Data</button></td>
+                        <!--<td><button id="loadTableData" onclick="loadTableData()">Load Table Data</button></td> -->
                         <td><select id="select" onchange="getPositionProjections()"><option value="All slates">All slates</option></select></td>
                         <td><select id="positionSelect" onchange="getPositionProjections()">
                             <option value="All positions">All positions</option>
@@ -41,14 +51,16 @@
                             <option value="WR">WR</option>
                             <option value="TE">TE</option>
                             <option value="DST">DST</option>
+                            <option value="CPT">CPT</option>
+                            <option value="FLEX">FLEX</option>
                         </select></td>
                         <td><select id="teamSelect" onchange="getPositionProjections()"><option value="All teams">All teams</option></option></select></td>
                     </table>
                 </div>
                 <div id="table">
                     <table id="contestDataTable" class="tablesorter">
-                        <thead>
-                            <th>Image</th>
+                        <tr>
+                            <th>Game Info</th>
                             <th>Name</th>
                             <th>Position</th>
                             <th>Team</th>
@@ -56,12 +68,10 @@
                             <th>Salary</th>
                             <th>ID</th>
                             <th>PPG</th>
-                            <th>Slate Time</th>
+                            <th>Slate</th>
                             <th>Projection</th>
-                        </thead>
-                        <tbody>
-                            
-                        </tbody>
+                        </tr>
+
                     </table>
                 </div>
             </div>
@@ -152,9 +162,9 @@
         </div>
         <div id="defenses" class="tabContent" style="display:none">
             <div class="sectionHeader">
-                <h4>Defense Data<br>Stats are normalized against mean and standard deviations of projections across league</h4>
+                <h3>Defense Data</h3><h4>Data pulled from defenses.json file.<br>Stats should be normalized against mean and standard deviations of projections across league.</h4>
             </div>
-            <button onclick="getDefenseProjections()">Scrape Defense Data</button>
+            <!--<button onclick="getDefenseProjections()">Scrape Defense Data</button>-->
             
             <table id="defensesTable" class="tablesorter">
                 <thead>
@@ -201,23 +211,25 @@
         <div id="builder" class="tabContent" style="display:none">
             <div class="sectionHeader">
                 Pick a slate to optimize: <select id="select2" onchange="updateOtherSelect()"><option value="All slates">All slates</option></select>
-                Slate type: <button class="builderButton" onclick="pickBuilder('Classic', event)" style="background-color: blue;">Classic</button><button class="builderButton" onclick="pickBuilder('Showdown', event)">Showdown</button>
-                <label style="float:none" for="slider">Variance: <text id="varianceValue">5</text></label><input type="range" id="varianceSlider" value="5" min="0" max="10" step="1" onchange="updateSlider()">
+                <!--Slate type: <button class="builderButton" onclick="pickBuilder('Classic')" style="background-color: blue;">Classic</button><button class="builderButton" onclick="pickBuilder('Showdown')">Showdown</button>-->
+                <label style="float:none" for="slider">Variance: <text id="varianceValue">6</text></label><input type="range" id="varianceSlider" value="6" min="0" max="10" step="1" onchange="updateSlider()">
             </div>
             <div id="builderControl" class="sectionHeader">
-                Lineups to build: <input type="number" id="lineupsToBuild" value="1" min="1" max="150">
-                <button class="buildLineups" onclick="buildLineups()">Build Lineup</button><button class="buildLineups" onclick="buildShowdownLineups()" style="display:none">Build Lineup</button>
+                Lineups to build: <input type="number" id="lineupsToBuild" value="20" min="1">
+                <button class="buildLineups classicBuilder" onclick="buildLineups()">Build Lineups</button><button class="buildLineups showdownBuilder" onclick="buildShowdownLineups()" style="display:none">Build Lineups</button>
+                <br><text class="classicBuilder">Min stack (not including QB): </text><input class="classicBuilder" type="number" id="minStack" value="1" min="0" max="4">
+                <br><text class="classicBuilder">Max stack (not including QB): </text><input class="classicBuilder" type="number" id="maxStack" value="2" min="0" max="4">
                 <!-- Have user upload .csv of contest info they want to build for -->
                 <div class="csvSection">
-                    <label style="float:none" for="contestcsv">Import salaries: </label><input type="file" name="contestcsv" id="contestcsv" oninput="handlecsv()">
-                    <button onclick="downloadLineupsShowdown()" style="display:none" class="downloadLineupsButton">Download Lineups for Initial Upload</button><button onclick="downloadLineups()" class="downloadLineupsButton">Download Lineups for Initial Upload</button>
+                    <!--<label style="float:none" for="contestcsv">Import salaries: </label><input type="file" name="contestcsv" id="contestcsv" oninput="handlecsv('contestcsv')">-->
+                    <button onclick="downloadLineupsShowdown()" style="display:none" class="downloadLineupsButton showdownBuilder">Download Lineups for Initial Upload</button><button onclick="downloadLineups()" class="downloadLineupsButton classicBuilder">Download Lineups for Initial Upload</button><button style="float:right" onclick="clearLineups()">Clear Lineups</button>
                 </div>
                 <div class="csvSection">
                     <label style="float:none" for="editcsv">Lineups for edit: </label><input type="file" name="editcsv" id="editcsv" oninput="handleLineupscsv()">
-                    <button onclick="downloadEditedLineupsShowdown()" style="display:none" class="downloadLineupsButton">Download Edited Lineups</button><button onclick="downloadEditedLineups()" class="downloadLineupsButton">Download Edited Lineups</button>
+                    <button onclick="downloadEditedLineupsShowdown()" style="display:none" class="downloadLineupsButton showdownBuilder">Download Edited Lineups</button><button onclick="downloadEditedLineups()" class="downloadLineupsButton classicBuilder">Download Edited Lineups</button>
                 </div>
             </div>
-            <div id="Classic" class="builderSection">
+            <div id="Classic" class="builderSection classicBuilder">
                 <table id="lineupTable">
                     <thead>
                         <th>QB</th>
@@ -237,7 +249,7 @@
                     </tbody>
                 </table>
             </div>
-            <div id="Showdown" style="display:none" class="builderSection">
+            <div id="Showdown" style="display:none" class="builderSection showdownBuilder">
                 <table id="showdownLineupTable">
                     <thead>
                         <th>Captain</th>
@@ -294,23 +306,21 @@
                 <label style="width:auto" for="playerMedians">Upload From File:</label><input type="file" name="playerMedians" id="playerMedians" oninput="handleTXT('playerMedians')">
             </div>
             <table id="playerMediansTable" class="tablesorter">
-                <thead>
-                    <th>Image</th>
-                    <th>Name</th>
-                    <th>Position</th>
-                    <th>Team</th>
-                    <th>Passing Yards</th>
-                    <th>Passing TDs</th>
-                    <th>Interceptions</th>
-                    <th>Receptions</th>
-                    <th>Receiving Yards</th>
-                    <th>Receiving TDs</th>
-                    <th>Rushing Yards</th>
-                    <th>Rushing TDs</th>
-                </thead>
-                <tbody>
-                    
-                </tbody>
+                    <tr>
+                        <th>Game</th>
+                        <th>Name</th>
+                        <th>Position</th>
+                        <th>Team</th>
+                        <th>Passing Yards</th>
+                        <th>Passing TDs</th>
+                        <th>Interceptions</th>
+                        <th>Receptions</th>
+                        <th>Receiving Yards</th>
+                        <th>Receiving TDs</th>
+                        <th>Rushing Yards</th>
+                        <th>Rushing TDs</th>
+                    </tr>
+
             </table>
         </div>
         <div id="setTeamMedians" class="tabContent" style="display:none">
@@ -340,7 +350,8 @@
         </div>
         <div id="injuries" class="tabContent" style="display:none">
             <div class="sectionHeader">
-                <h4>Injury Data</h4>
+                <h3>Injury Data</h3>
+                <h4>Put the injured player in the first column, then allocate their usage (percentage-wise) to their teammates.<br>Teammate allocation should be "Player Name" | "Percent allocation" (0-100)</h4>
             </div>
             <button onclick="addInjured()">Add row</button>
             <button onclick="reloadPage()">Save</button>

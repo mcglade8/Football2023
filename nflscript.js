@@ -1,55 +1,47 @@
 // Scrape contest data from Draftkings.com for upcoming NFL contests
 var corsAPI = "https://cors-anywhere.herokuapp.com/";
 var url = "https://www.draftkings.com/lobby/getcontests?sport=NFL";
-var select = document.getElementById('select');
-var table = document.getElementById("contestDataTable");
-console.log("If requests fail, may need to go to https://cors-anywhere.herokuapp.com/corsdemo to re-authorize");
-async function getContestData(){
-// Clear table of previous data
-var table = document.getElementById("contestDataTable");
-    var rows = table.rows;
-    while(rows.length > 1){
-        table.deleteRow(-1);
-    }
-    clearSaves(); // clears local storage of saved table data
-    select.innerHTML = '<option value="All slates">All slates</option>';
 
+console.log("If requests fail, may need to go to https://cors-anywhere.herokuapp.com/corsdemo to re-authorize");
+async function getContestData(DKSalaries){
     var contestData = [];
-    // Get an array of Contests from data that we can iterate thru to get contest start times
-        
-    let myPromise = new Promise(function(resolve, reject) {
-        console.log("new pull");
-        let req = new XMLHttpRequest();
-        req.open('GET', corsAPI+url);
-        req.onload = function() {
-            if (req.status == 200) {
-                resolve(req.response);
-            }
-            else {
-                reject(Error(req.statusText));
-            }
-        };
-        req.send();
-    });
-    data = await myPromise;
-    originalData = JSON.parse(data).Contests;
-    var contestData = [];
-    for(let c of originalData){
-        let sd = Number(c.sd.replace("/Date(", "").replace(")/", ""));
-        let rightnow = new Date();
-        if(sd > rightnow.valueOf()) contestData.push(c);
+    localStorage.DKSalaries = JSON.stringify(DKSalaries);
+    // Add contest info from uploaded file to contestData
+    var contestDate = document.getElementById("contestDate").value;
+    var contestName = document.getElementById("contestName").value;
+    for(let i of DKSalaries){
+        if('Game Info' in i) if(i['Game Info'] != undefined) contestData.push(i);
     }
-    localStorage.scrapedContestData = JSON.stringify(contestData); 
-    addSelectOption(contestData);
-    getPlayerData(contestData);
-    setDefenseProjections();
+    //localStorage.contestData = JSON.stringify(contestData);
+    //console.log(contestData)
+    addSelectOption(contestName, contestDate);
+    addTableRows(contestData, contestName, contestDate);
+    
+    //getPlayerData(contestData);
+    //setDefenseProjections();
+}
+
+function getGameStartTime(gameInfo){
+    let gameTime = gameInfo.split(" ")[2];
+    let gameDate = gameInfo.split(" ")[1];
+    let gameDateSplit = gameDate.split("/");
+    let gameYear = gameDateSplit[2];
+    let gameMonth = gameDateSplit[0];
+    let gameDay = gameDateSplit[1];
+    let gameHour = gameTime.split(":")[0];
+    let gameMinute = gameTime.split(":")[1];
+    if(gameTime.includes("PM") && gameHour != 12) gameHour = Number(gameHour) + 12;
+    // format date for comparison
+    let gameString = (gameYear + "-" + gameMonth + "-" + gameDay + "T" + gameHour + ":" + gameMinute).replace("PM", "").replace("AM", "");
+    let gameDateObj = new Date(gameString);
+    return gameDateObj;
 }
 
 function updateContestData(){
     var contestData = JSON.parse(localStorage.scrapedContestData);
 
     addSelectOption(contestData);
-    getPlayerData(contestData);
+    addTableRows(contestData, contestName, contestDate);
     setDefenseProjections();
     saveTableData();
 }
@@ -70,113 +62,74 @@ function removeDuplicates(){
     }
 }
 
-function addSelectOption(contestData){
-    // Add a select so user can choose which contest start time to display in a table
+function addSelectOption(contestName, contestDate){
     var select = document.getElementById('select');
+    // Add a select so user can choose which contest start time to display in a table
     var startTimes = [];
     var options = select.children;
     for(let o of options){
         startTimes.push(o.innerHTML);
     }
-    for (var i = 0; i < contestData.length; i++) {
-            var startTime = contestData[i]['sdstring'];
-            // If start time is already in contestData, skip it. Otherwise add to startTimes
-            if (!startTimes.includes(startTime) && !contestData[i]['n'].includes("Madden") ) {
-                startTimes.push(startTime);
-                var option = document.createElement("option");
-                option.text = startTime;
-                select.add(option);
-            }
-    }      
+    if(startTimes.includes(contestName + " " + contestDate)) return; else {
+        var option = document.createElement("option");
+        option.innerHTML = contestName + " " + contestDate;
+        option.value = contestName + " " + contestDate;
+        select.add(option);
+    }    
 }
 
-// Get player data for the contest start time selected by the user
-async function getPlayerData(contestData){
-    for(let o of select.options){
-        if(o.value != "default"){
-            let selectedStartTime = o.innerHTML;
-            
-            let i = 0;
-            while(i < contestData.length-20 &&(!'sdstring' in contestData[i] || contestData[i]['sdstring'] != selectedStartTime)&& !contestData[i]['n'].includes("Madden")){
-                i++;
-            }                        
-            var selectedID = contestData[i]['dg'];
-            // get contest data from draftkings based on selectedID
-            var newurl = "https://www.draftkings.com/lineup/getavailableplayers?contestTypeId=70&draftGroupId="+selectedID+"&gameTypeId=1&sport=NFL";
-            let myPromise = new Promise(function(resolve) {
-                let req = new XMLHttpRequest();
-                req.open('GET', corsAPI+newurl);
-                req.onload = function() {
-                    if (req.status == 200) {
-                        resolve(req.response);
-                    }
-                    else {
-                        reject(Error(req.statusText));
-                        console.log("May need to refresh cors-anywhere.herokuapp.com authorization, or if 429 error, wait due to too many requests.")
-                    }
-                };
-                req.send();
-            });
-            data = await myPromise;
-            var playerData = JSON.parse(data);
-            
-            addTableRows(playerData, selectedStartTime);
-            
-        }
-    }
-}
- 
-function addTableRows(playerData, selectedStartTime){
+function addTableRows(contestData, contestName, contestDate){
     var table = document.getElementById("contestDataTable");
-    var playersInList = [];
-    
-    for(let p of playerData['playerList']){
+    var ids = [];
+    var rows = table.rows;
+    for(let i=0; i < rows.length; i++){
+        let r = rows[i];
+        if(Number(r.rowIndex)>0) ids.push(r.cells[6].innerHTML.trim());
+    }
+    for(let p of contestData){
         // If player is already in table, skip it. Otherwise add to playersInList
-        var inListName = p['fn'] + " " + p['ln'];
-        if (!playersInList.includes(inListName.trim())) {
-            playersInList.push(inListName.trim());
+        if(!ids.includes(p['ID'])) {
+            ids.push(p['ID'].trim());
             var row = table.insertRow(-1);
-            var cell = row.insertCell(0);
-            var img = document.createElement('img');
-            img.src = p['imgSm'];
-            cell.appendChild(img);
-            row.insertCell(1).innerHTML = p['fn'] + " " + p['ln'];
-            row.insertCell(2).innerHTML = p['pn'];
-            if(p['htid'] == p['tid']){
-                row.insertCell(3).innerHTML = p['htabbr'];
-            }else{
-                row.insertCell(3).innerHTML = p['atabbr'];
-            }
-            if(p['htid'] == p['tid']){
-                row.insertCell(4).innerHTML = p['atabbr'];
-            }else{
-                row.insertCell(4).innerHTML = p['htabbr'];
-            }
-            
-            row.insertCell(5).innerHTML = p['s'];
-            row.insertCell(6).innerHTML = p['pid'];
-            row.insertCell(7).innerHTML = p['ppg'];
-            row.insertCell(8).innerHTML = selectedStartTime;
-            row.insertCell(9).innerHTML = p['ppg'];
+            row.insertCell(0).innerHTML = (p['Game Info'].split(" ")[0] + " " + p['Game Info'].split(" ")[2]).trim();
+            row.insertCell(1).innerHTML = p['Name'].trim();
+            if(p['Roster Position'] == 'FLEX' || p['Roster Position'] == 'CPT') {
+                row.insertCell(2).innerHTML = p['Roster Position'].trim();
+                if(p['Position'] == 'DST'){ 
+                    row.cells[2].setAttribute("defense", "true");
+                    //console.log(p);
+                }
+            } else row.insertCell(2).innerHTML = p['Position'].trim();
+            row.insertCell(3).innerHTML = p['TeamAbbrev'].trim();
+            row.insertCell(4).innerHTML = p['Game Info'].split(" ")[0].replace("@" , "").replace(p['TeamAbbrev'], "").trim();
+            row.insertCell(5).innerHTML = p['Salary'].trim();
+            row.insertCell(6).innerHTML = p['ID'].trim();
+            row.insertCell(7).innerHTML = 0;
+            row.insertCell(8).innerHTML = (contestName + " " + contestDate).trim();
+            row.insertCell(9).innerHTML = 0;
         }
     }
+    clearOldData();
+    saveTableData();
+    location.reload();
 }
 
 
 // Make contestDataTable sortable
 $(function() {
     //$("#contestDataTable").tablesorter(); // Not doing anything since I added my own sort function
-    loadTableData();
-    removeDuplicates();
+    if(localStorage.tableData) loadTableData();
+    //removeDuplicates();
     fillTeamSelect();
     getTeamMedians();
     colorTableRows();
     getPlayerMedians();
     getInjuryTable();
+    getDefenseProjections();
+    //setDefenseProjections();
     updateProjectionsFromMedians();
-    setDefenseProjections();
     adjustProjectionsByInjuries();
-
+    captainize();
 });
 
 // Save contestDataTable data for access at a later date
@@ -189,18 +142,26 @@ function saveTableData(){
         var rowData = [];
         for (var j = 0; j < row.cells.length; j++) {
             rowData.push(row.cells[j].innerHTML);
-            if(row.cells[j].getAttribute("projections") != null){
+            let proj = row.cells[j].getAttribute("projections");
+            if(proj != null && proj != undefined && proj != ""){
+                console.log(proj);
                 let sumProj = 0;
-                for(let p of Object.values(JSON.parse(row.cells[j].getAttribute("projections")))){
+                for(let p of Object.values(JSON.parse(proj))){
                     sumProj += Number(p);
                 }
-                if(sumProj > 0) rowData.push(row.cells[j].getAttribute("projections"));
+                if(sumProj > 0) rowData.push(proj);
             }
+            
         }
+        let dst = row.cells[2].getAttribute("defense");
+        if(dst != null && dst != undefined && dst != ""){
+            rowData.push(dst);
+        }
+
         tableData.push(rowData);
 
     }
-    console.log(JSON.stringify(tableData).length);
+    //console.log(JSON.stringify(tableData).length);
     localStorage.setItem("tableData", JSON.stringify(tableData));
 }
 
@@ -216,8 +177,8 @@ function loadTableData(){
         var row = table.insertRow(-1);
         for (var j = 0; j < tableData[i].length; j++) {
             if(j == 10){
-                row.cells[j-1].setAttribute("projections", tableData[i][j]);
-            }else{
+                if(tableData[i][j] == "true") row.cells[2].setAttribute("defense", "true"); else row.cells[j-1].setAttribute("projections", tableData[i][j]);
+            }else {
                 row.insertCell(j).innerHTML = tableData[i][j];
             }
         }
@@ -373,56 +334,27 @@ function newProjection(){
 
 // Scrape defense points allowed projections from fantasypros.com
 async function getDefenseProjections(){
-    var url = "https://www.fantasypros.com/nfl/projections/dst.php?week=2";
-    let myPromise = new Promise(function(resolve, reject) {
-        let req = new XMLHttpRequest();
-        req.open('GET', corsAPI+url);
-        req.onload = function() {
-            if (req.status == 200) {
-                resolve(req.response);
-            }
-            else {
-                reject(Error(req.statusText));
-            }
-        };
-        req.send();
+    let promise = new Promise(function(resolve) {
+    defenseProjections = getInfoFromJSON('defenses.json');    
+    var table = document.getElementById("defensesTable");
+    
+    for(let d of Object.keys(defenseProjections)){
+        var row = table.insertRow(-1);
+        row.insertCell(0).innerHTML = d;
+        row.insertCell(1).innerHTML = teamNameToAbbrev(d);
+        row.insertCell(2).innerHTML = defenseProjections[d]["Sacks"];
+        row.insertCell(3).innerHTML = defenseProjections[d]["Interceptions"];
+        row.insertCell(4).innerHTML = defenseProjections[d]["Fumbles Recovered"];
+        row.insertCell(5).innerHTML = defenseProjections[d]["Defensive TDs"];
+        row.insertCell(6).innerHTML = defenseProjections[d]["Points Allowed"];
+        row.insertCell(7).innerHTML = defenseProjections[d]["Yards Allowed"];
+    }
+
+    resolve();
     });
-    data = await myPromise;
+    //localStorage.setItem("defenseProjections", JSON.stringify(defenseProjections));
+    promise.then(() => setDefenseProjections());
     
-    var parser = new DOMParser();
-    var doc = parser.parseFromString(data, "text/html");
-    var table = doc.getElementById("data");
-    var rows = table.rows;
-    var defenseProjections = [];
-    for (var i = 1; i < rows.length; i++) {
-        var team = rows[i].cells[0].firstChild.innerHTML;
-        var sacks = Number(rows[i].cells[1].innerHTML);
-        var interceptions = Number(rows[i].cells[2].innerHTML);
-        var fumblesRecovered = Number(rows[i].cells[3].innerHTML);
-        var touchdowns = Number(rows[i].cells[5].innerHTML);
-        var pointsAllowed = Number(rows[i].cells[7].innerHTML);
-        var yardsAllowed = Number(rows[i].cells[8].innerHTML.replace(",", ""));
-        defenseProjections.push([team, sacks, interceptions, fumblesRecovered, touchdowns, pointsAllowed, yardsAllowed]);
-    }
-    // Calculate means and standard deviations for each stat in defenseProjections
-    var statMeans = [];
-    var statSDs = [];
-    for(let i = 1; i < defenseProjections[0].length; i++){
-        var stat = [];
-        for(let d of defenseProjections){
-            stat.push(d[i]);
-        }
-        statMeans.push(average(stat));
-        statSDs.push(standardDeviation(stat));
-    }
-    
-    for(let d of defenseProjections){
-        for(let i = 1; i < d.length; i++){
-            d[i] = (d[i] - statMeans[i-1]) / statSDs[i-1];
-        }
-    }
-    localStorage.setItem("defenseProjections", JSON.stringify(defenseProjections));
-    setDefenseProjections();
 }
 
 // Calculate standard deviation
@@ -463,7 +395,7 @@ function loadDefenseProjections(){
         }
     }
 }
-loadDefenseProjections();
+//loadDefenseProjections();
 
 // Add column to defensesTable for team abbreviations
 function addTeamAbbr(){
@@ -820,51 +752,61 @@ function randomizeProjection(proj, position){
 
     // curveLean is how much the curve leans away from the mean; 
     // under .5 means it leans right, over .5 means it leans left
-    var curveLean = 0;
+    var curveLean = 0.5;
 
     // varianceStrength is how much variance affects the projections
-    var varianceStrength = 0;
+    var varianceStrength = 1.5;
 
     // random number between 0 and 1
-    var rand = Math.random();
+    var rand = randomNormal();
 
     switch(position){
         case "QB":
-            curveLean = 0.75;
-            varianceStrength = 1.2;
+            curveLean = 0.7;
+            varianceStrength = 1.8;
             break;
         case "RB":
-            curveLean = .63;
-            varianceStrength = 1.4;
+            curveLean = .65;
+            varianceStrength = 1.8;
             break;
         case "WR":
-            curveLean = .75;
-            varianceStrength = 1.9;
+            curveLean = .5;
+            varianceStrength = 1.8;
             break;
         case "TE":
-            curveLean = .75;
+            curveLean = .65;
             varianceStrength = 1.5;
             break;
         case "DST":
-            curveLean = .68;
-            varianceStrength = .6;
+            curveLean = .7;
+            varianceStrength = 1.2;
             break;
         case "K":
             curveLean = .5;
-            varianceStrength = .5;
+            varianceStrength = 1;
     }
 
     var thisProj = Number(proj);
-    variance = (variance*varianceStrength+thisProj*.2)*(rand-curveLean); // variance is higher for higher projections; manipulated by randomness and curveLean
+    variance = (variance*varianceStrength+thisProj*.5)*(rand-curveLean); // variance is higher for higher projections; manipulated by randomness and curveLean
     if(thisProj <= 0) return 0;
     return (thisProj+variance).toFixed(1);
+}
+
+// Return a randomized number between 0 and 1 with a normal distribution and mean of .5
+function randomNormal(){
+    var rand = 0;
+    for (var i = 0; i < 6; i += 1) {
+        rand += Math.random();
+    }
+    return rand / 6;
 }
 
 
 // Solve a DraftKings classic lineup for a given contest start time
 // Solver from https://github.com/JWally/jsLPSolver
 function optimizeClassic(players){
-    
+    var minStack = Number(document.getElementById("minStack").value);
+    var maxStack = Number(document.getElementById("maxStack").value);
     //var lineup = [];
     //var positions = ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "DST"];
     var salaryCap = 50000;
@@ -895,29 +837,38 @@ function optimizeClassic(players){
     var modelVariables = {};
     for(let p of QBs){
         let pid = p.id;
+        let pstack = p.team+"QB";
         modelVariables[p.name] = {"proj": p.proj, "salary": p.salary, "QB": 1, "i": 1};
         modelVariables[p.name][pid] = 1;
+        modelVariables[p.name][pstack] = minStack;
     }
     for(let p of RBs){
         let pid = p.id;
+        let pstack = p.team+"QB";
         modelVariables[p.name] = {"id": p.id, "proj": p.proj, "salary": p.salary, "RB": 1, "FLEX": 1, "i": 1};
         modelVariables[p.name][pid] = 1;
+        modelVariables[p.name][pstack] = -1;
     }
     for(let p of WRs){
         let pid = p.id;
+        let pstack = p.team+"QB";
         modelVariables[p.name] = {"id": p.id, "proj": p.proj, "salary": p.salary, "WR": 1, "FLEX": 1, "i": 1};
         modelVariables[p.name][pid] = 1;
+        modelVariables[p.name][pstack] = -1;
     }
     for(let p of TEs){
         let pid = p.id;
+        let pstack = p.team+"QB";
         modelVariables[p.name] = {"id": p.id,"proj": p.proj, "salary": p.salary, "TE": 1, "FLEX": 1, "i": 1};
         modelVariables[p.name][pid] = 1;
+        modelVariables[p.name][pstack] = -1;
     }
     for(let p of DSTs){
         let pid = p.id;
         modelVariables[p.name] = {"id": p.id,"proj": p.proj, "salary": p.salary, "DST": 1, "i": 1};
         modelVariables[p.name][pid] = 1;
     }
+    
     var results;
     require(['solver'], function(solver) {
         var model = {
@@ -936,15 +887,21 @@ function optimizeClassic(players){
             "variables": modelVariables,
             "ints": {}
         };
-
-        for(let p of players){
-            model.constraints[p.id] = {"max": 1};
-            model.ints[p.name] = 1;
+  
+        for(let p of Object.keys(modelVariables)){
+            let id = modelVariables[p]['id'];
+            if(id== undefined) continue;
+            
+            model.constraints[id] = {"max": 1, "min": 0};
+            model.ints[p] = 1;
+            if(!model.constraints[p.team+"QB"]) {
+                model.constraints[p.team+"QB"] = {"max": 0, "min": 1-maxStack};
+            }
         }
         results = solver.Solve(model);
-
+        
         // make sure it's not already in our lineups
-
+        
         var alreadyBuilt = false;
         var thisLineup = [];
         for(let k of Object.keys(results)){
@@ -1040,38 +997,28 @@ function addLineup(lineup,players){
 }
 
 
-function pickBuilder(section, event){
-    var builderButtons = document.getElementsByClassName("builderButton");
-    for(let b of builderButtons){
-        b.style.backgroundColor = "#272727";
-    }
-    event.target.style.backgroundColor = "blue";
-    var builderSections = document.getElementsByClassName("builderSection");
-    for(let s of builderSections){
-        if(s.id == section){
-            s.style.display = "block";
-        }else{
-            s.style.display = "none";
-        }
-    }
+function pickBuilder(section){
+   
+    
+    var classicBuilder = document.getElementsByClassName("classicBuilder"); 
+    var showdownBuilder = document.getElementsByClassName("showdownBuilder");
+    
     
     if(section == "Classic") {
-        document.getElementsByClassName("buildLineups")[0].style.display="";
-        document.getElementsByClassName("buildLineups")[1].style.display="none";
+        for(let c of classicBuilder){
+            c.style.display = "";
+        }
+        for(let c of showdownBuilder){
+            c.style.display = "none";
+        }
     } else{
-        document.getElementsByClassName("buildLineups")[0].style.display="none";
-        document.getElementsByClassName("buildLineups")[1].style.display="";
-    }
-    
-    var downloadLineupsButton = document.getElementById("downloadLineupsButton");
-    for(let b of downloadLineupsButton){
-        if(b.style.display = "none"){
-            b.style.display = "";
-        }else{
-            b.style.display = "none";
+        for(let c of classicBuilder){
+            c.style.display = "none";
+        }
+        for(let c of showdownBuilder){
+            c.style.display = "";
         }
     }
-
 
 }
 
@@ -1101,33 +1048,54 @@ function buildShowdownLineups(){
     }   
 }
 
+// Generate new projections
+function generateProjections(){
+    var contestDataTable = document.getElementById("contestDataTable");
+    var contestTime = document.getElementById("select").value;
+    var players = [];
+
+    for(let r of contestDataTable.rows){
+        if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position")){
+            var player = {name: r.cells[1].innerHTML, id: r.cells[6].innerHTML, position: r.cells[2].innerHTML, team: r.cells[3].innerHTML, opponent: r.cells[4].innerHTML, salary: r.cells[5].innerHTML, proj: randomizeProjection(r.cells[9].innerHTML, r.cells[2].innerHTML)};
+            players.push(player);
+        }
+    }
+    players = correlateByTeam(players);
+
+    return players;
+}
+
 // Manipulate projections to correlate by team
 function correlateByTeam(players){
     var teamProjections = {};
     for(let p of players){
         if(teamProjections[p.team] == undefined){
-            teamProjections[p.team] = {correlate: (Math.random()*1.5-.75)};
+            teamProjections[p.team] = {correlate: (randomNormal()*3-1.5)};
         }
     }
     for(let p of players){
         switch(p.position){
             case "QB":
-                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * .5+teamProjections[p.opponent].correlate * .5)).toFixed(1);
+                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * .75+teamProjections[p.opponent].correlate * .5)).toFixed(1);
                 break;
             case "RB":
                 p.proj = (p.proj * (1 + teamProjections[p.team].correlate * .05-teamProjections[p.opponent].correlate * .15)).toFixed(1);
                 break;
             case "WR":
-                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * .3+teamProjections[p.opponent].correlate * .3)).toFixed(1);
+                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * .65+teamProjections[p.opponent].correlate * .3)).toFixed(1);
                 break;
             case "TE":
-                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * .3)).toFixed(1);
+                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * .4)).toFixed(1);
                 break;
             case "DST":
                 p.proj = (p.proj * (1 - teamProjections[p.opponent].correlate * 0.8 + teamProjections[p.team].correlate * .2)).toFixed(1);
                 break;
             case "K":
                 p.proj = (p.proj * (1 + teamProjections[p.team].correlate * .2-teamProjections[p.opponent].correlate * .2)).toFixed(1);
+                break;
+            default: 
+                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * .5)).toFixed(1);
+                break;
         }
         if(p.proj <= 0) p.proj = 0;
     }
@@ -1135,26 +1103,33 @@ function correlateByTeam(players){
 }
 
 // Solve a DraftKings showdown lineup for a given contest start time
-var builtLineups = [];
 function optimizeShowdown(players){
     //setTimeout(function(){return;}, 1000);
     var modelVariables = {};
+    var teams = [];
     for(let p of players){
         if(p.proj <= 0) continue;
-        let pid = p.id;
-        let pteam = p.team;
-        modelVariables[p.name] = {"proj": p.proj, "salary": p.salary, "i": 1, "CPT": 0};
-        modelVariables[p.name][pid] = 1;
-        modelVariables[p.name][pteam] = 1;
+        let n = p.name;
+        let t = p.team;
+        if(!teams.includes(t)) teams.push(t);
+                
+        if(p.position == "CPT"){
+            modelVariables["CPT " + n] = {"proj": p.proj, "salary": p.salary, "CPT": '1', "i": '1'};
+            modelVariables["CPT " + n][n] = '1';
+            modelVariables["CPT " + n][t] = '1';
+        }else{
+            modelVariables[n] = {"proj": p.proj, "salary": p.salary, "i": '1'};
+            modelVariables[n][n] = '1';
+            modelVariables[n][t] = '1';
 
-        modelVariables["CPT "+p.name] = {"proj": p.proj * 1.5, "salary": p.salary * 1.5, "i": 1, "CPT": 1};
-        modelVariables["CPT "+p.name][pid] = 1;
-        modelVariables["CPT "+p.name][pteam] = 1;
+        }
+
     }
-
+    console.log(modelVariables);
 
     var results;
     require(['solver'], function(solver) {
+        
         var model = {
             "optimize": "proj",
             "opType": "max",
@@ -1166,17 +1141,18 @@ function optimizeShowdown(players){
             "variables": modelVariables,
             "ints": {}
         };
-
-        for(let p of players){
-            model.constraints[p.id] = {"max": 1};
-            model.constraints[p.team] = {"max": 5};
-            model.ints[p.name] = 1;
-            model.ints["CPT "+p.name] = 1;
+        for(let k of Object.keys(modelVariables)){
+            let p = modelVariables[k];
+            model.constraints[p.name] = {"max": '1'};
+            //model.constraints[p.team] = {"max": '5'};
+            model.constraints[k] = {"max": '1'};
+            model.ints[k] = '1';
+        }
+        for(let t of teams){
+            model.constraints[t] = {"max": '5'};
         }
 
         results = solver.Solve(model);
-        console.log(results);
-
         // make sure it's not already in our lineups
 
         var alreadyBuilt = false;
@@ -1186,21 +1162,24 @@ function optimizeShowdown(players){
             if(k != "feasible" && k != "result" && k != "bounded" && k != "iterations" && k != "time" && k != "dual" && k != "primal" && k != "isIntegral"){
                 var x=0;
                 while(x < players.length){
-                    if(players[x].name.trim() == k.trim()){ 
-                        thisLineup.push(players[x]); 
-                    } else if(players[x].name.trim() == k.replace("CPT ", "").trim()){
+                    if(players[x].name.trim() === k.trim()){ 
+                        thisLineup.push(players[x].name); 
+                    } else if(players[x].name.trim() === k.replace("CPT ", "").trim()){
                         cpt = players[x].name;
                     } 
                     x++;
                 }
-                thisLineup = sortArray(thisLineup);
-                thisLineup.push(cpt);
+                
             }
         }
+        thisLineup = sortArray(thisLineup);
+        thisLineup.push(cpt);
+        //thisLineup = JSON.stringify(thisLineup);
+        var builtLineups = getBuiltShowdownLineups();
         for(let l of builtLineups){
-            if(l == thisLineup) alreadyBuilt = true;
+            if(JSON.stringify(l) == JSON.stringify(thisLineup)) alreadyBuilt = true;
         }
-        if(!alreadyBuilt) setTimeout(addLineupShowdown(results, players), 100); else(optimizeShowdown(players));
+        if(!alreadyBuilt) setTimeout(addLineupShowdown(results, players), 100); else(optimizeShowdown(generateProjections()));
     });
 }
 // Sort array alphabetically - using to compare lineups to see if they're already built
@@ -1217,43 +1196,88 @@ function sortArray(arr){
             }
         }
     }
-    return arr;
+    return getUnique(arr);
 }
+
+// Delete all lineups from lineupTables
+function clearLineups(){
+    var lineupTable = document.getElementById("lineupTable");
+    var showdownLineupTable = document.getElementById("showdownLineupTable");
+    while(lineupTable.rows.length > 1){
+        lineupTable.deleteRow(-1);
+    }
+    while(showdownLineupTable.rows.length > 1){
+        showdownLineupTable.deleteRow(-1);
+    }
+}
+
+// Remove duplicates from array
+function getUnique(arr){
+    var unique = [];
+    for(let a of arr){
+        if(!unique.includes(a)) unique.push(a);
+    }
+    return unique;
+}
+
+
+// Get lineups that have already been built from showdownLineupTable and return an array of names, sorted alphabetically, with CPT at the end
+function getBuiltShowdownLineups(){
+    var lineups = [];
+    var rows = document.getElementById("showdownLineupTable").rows;
+    for(let r of rows){
+        var lineup = [];
+        for(let i = 1; i < 6; i++){
+            let name = r.cells[i].innerHTML.split("<br>")[0];
+            lineup.push(name);
+        }
+        lineup = sortArray(lineup);
+        let cpt = r.cells[0].innerHTML.split("<br>")[0];
+        lineup.push(cpt);
+        lineups.push(lineup);
+    }
+    return lineups;
+}
+
 
 
 
 // Add lineup to showdownLineupTable
 function addLineupShowdown(lineup,players){
     //setTimeout(function(){return;}, 1000);
-
     var lineupTable = document.getElementById("showdownLineupTable");
     var row = lineupTable.insertRow(-1);
     var lineupForTable = [];
     for(let k of Object.keys(lineup)){
         if(k != "feasible" && k != "result" && k != "bounded" && k != "iterations" && k != "time" && k != "dual" && k != "primal" && k != "isIntegral"){
-            var found = false, x=0, isCPT = false;
+            var found = false, x=0;
             while(!found && x < players.length){
-                if(players[x].name.trim() == k.trim()){ 
-                    found = true; 
-                } else if(players[x].name.trim() == k.replace("CPT ", "").trim()){
-                    found = true;
-                    isCPT = true;
-                } else x++;
+                if(players[x].name.trim() == k.replace("CPT ", "").trim()) {
+                    //console.log(players[x]);
+                    if(k.includes("CPT")){
+                        if(players[x]["position"] == 'CPT'){
+                            found = true; 
+                            lineupForTable.push(players[x]);
+                        } else x++;
+                    }else{
+                        if(players[x]["position"] != 'CPT'){
+                            found = true; 
+                            lineupForTable.push(players[x]);
+                        } else x++;
+                    }
+                }else x++;
             }
-            if(isCPT){
-                lineupForTable.push({name: "CPT "+players[x].name, team: players[x].team, salary: players[x].salary*1.5, proj: players[x].proj * 1.5});
-            }else{
-                lineupForTable.push(players[x]);
-            }
+
         }
     }
+    
     // order lineupForTable by position
     var cpts = [];
     var flexs = [];
     var totalProj =0;
     var totalSalary = 0;
     for(let p of lineupForTable){
-        if(p.name.includes("CPT")){
+        if(p.position == "CPT"){
             cpts.push(p);
         }else{
             flexs.push(p);
@@ -1289,47 +1313,62 @@ function updateSlider(){
 function updateOtherSelect(){
     var otherSelect = document.getElementById("select2").value;
     document.getElementById("select").value = otherSelect;
+
+    var rows = document.getElementById("contestDataTable").rows;
+    var i = 0;
+    var found = false;
+    while(!found){
+        if(rows[i].cells[8].innerHTML == otherSelect){
+            found = true;
+        }else{
+            i++;
+        }
+    }
+    if(rows[i].cells[2].innerHTML == "CPT" || rows[i].cells[2].innerHTML == "FLEX") {
+        pickBuilder('Showdown');
+    }else{
+        pickBuilder('Classic');
+    }
 }
 
 // Get player medians from storage, if it exists
 function getPlayerMedians(){
     var table = document.getElementById("playerMediansTable");
     var players = document.getElementById("contestDataTable").rows;
-    var playerMedians = {};
-    if(localStorage.playerMedians){
-        playerMedians = JSON.parse(localStorage.playerMedians);
-    }else{
-        confirm("Please upload a .txt file for playerMedians.");
-        playerMedians = {};
-    }
+    var playerMedians = getInfoFromJSON('playerMedians.json');
     var ths = table.getElementsByTagName("th");
     var teams = [];
+    var list = [];
     for(let p of players){
         if(!teams.includes(p.cells[3].innerHTML.trim()) && p.cells[1].innerHTML != "Player"){
             teams.push(p.cells[3].innerHTML.trim());
         }
         if(p.cells[1].innerHTML != "Player"){
-            var name = p.cells[1].innerHTML;
-            if(name in playerMedians){
-                var row = table.insertRow(-1);
-                for(let t of ths){
-                    if(["Image", "Name", "Position", "Team"].includes(t.innerHTML)) {
-                        var cell = row.insertCell(-1);
-                        cell.innerHTML = p.cells[t.cellIndex].innerHTML;
-                    }else{
-                        var cell = row.insertCell(-1);
-                        cell.innerHTML = '<label for="'+name+t.innerHTML+'Slider">'+playerMedians[name][t.innerHTML]+'</label><input type="range" min="0" max="100" value="'+playerMedians[name][t.innerHTML]+'" class="slider" id="'+name+t.innerHTML+'Slider" oninput="updateProjectionSlider(this.id)">';
-                    }   
-                }
-            } else{
-                var row = table.insertRow(-1);
-                for(let t of ths){
-                    if(["Image", "Name", "Position", "Team"].includes(t.innerHTML)) {
-                        var cell = row.insertCell(-1);
-                        cell.innerHTML = p.cells[t.cellIndex].innerHTML;
-                    }else{
-                        var cell = row.insertCell(-1);
-                        cell.innerHTML = '<label for="'+name+t.innerHTML+'Slider">0</label><input type="range" min="0" max="100" value="0" class="slider" id="'+name+t.innerHTML+'Slider" oninput="updateProjectionSlider(this.id)">';
+            if(!list.includes(p.cells[1].innerHTML.trim())){
+                list.push(p.cells[1].innerHTML.trim());
+            
+                var name = p.cells[1].innerHTML;
+                if(name in playerMedians){
+                    var row = table.insertRow(-1);
+                    for(let t of ths){
+                        if(["Game", "Name", "Position", "Team"].includes(t.innerHTML)) {
+                            var cell = row.insertCell(-1);
+                            cell.innerHTML = p.cells[t.cellIndex].innerHTML;
+                        }else{
+                            var cell = row.insertCell(-1);
+                            cell.innerHTML = '<label for="'+name+t.innerHTML+'Slider">'+playerMedians[name][t.innerHTML]+'</label><input type="range" min="0" max="100" value="'+playerMedians[name][t.innerHTML]+'" class="slider" id="'+name+t.innerHTML+'Slider" oninput="updateProjectionSlider(this.id)">';
+                        }   
+                    }
+                } else{
+                    var row = table.insertRow(-1);
+                    for(let t of ths){
+                        if(["Game", "Name", "Position", "Team"].includes(t.innerHTML)) {
+                            var cell = row.insertCell(-1);
+                            cell.innerHTML = p.cells[t.cellIndex].innerHTML;
+                        }else{
+                            var cell = row.insertCell(-1);
+                            cell.innerHTML = '<label for="'+name+t.innerHTML+'Slider">0</label><input type="range" min="0" max="100" value="0" class="slider" id="'+name+t.innerHTML+'Slider" oninput="updateProjectionSlider(this.id)">';
+                        }
                     }
                 }
             }
@@ -1356,7 +1395,7 @@ function updatePlayerMedians(){
         playerMedians[name] = {};
         var ths = table.getElementsByTagName("th");
         for(let t of ths){
-            if(["Image", "Name", "Position", "Team"].includes(t.innerHTML)) continue;
+            if(["Game", "Name", "Position", "Team"].includes(t.innerHTML)) continue;
             var slider = document.getElementById(name+t.innerHTML+"Slider");
             playerMedians[name][t.innerHTML] = slider.value;
         }
@@ -1401,7 +1440,7 @@ function populateSumOfLabels(){
         if(r.style.display != "none"){
             var ths = table.getElementsByTagName("th");
             for(let t of ths){
-                if(["Image", "Name", "Position", "Team"].includes(t.innerHTML)) continue;
+                if(["Game", "Name", "Position", "Team"].includes(t.innerHTML)) continue;
                 var slider = document.getElementById(r.cells[1].innerHTML+t.innerHTML+"Slider");
                 sums[t.cellIndex-4] += Number(slider.value);
             }
@@ -1416,44 +1455,122 @@ function populateSumOfLabels(){
 function getTeamMedians(){
     var table = document.getElementById("teamMediansTable");
     var players = document.getElementById("contestDataTable").rows;
-    var teamMedians = {};
-    if(localStorage.teamMedians){
-        teamMedians = JSON.parse(localStorage.teamMedians);
-    }else{
-        var c = confirm("Please upload a .txt file for teamMedians.");
-        teamMedians = {};
+
+    // get teamMedians from teamMedians.js file
+    var teamMedians = getInfoFromJSON('teamMedians.json');
+    
+    // Change team name to team abbrev with teamNameToAbbrev function
+    for(let k of Object.keys(teamMedians)){
+        teamMedians[teamNameToAbbrev(k)] = teamMedians[k];
+        delete teamMedians[k];
     }
-    var ths = table.getElementsByTagName("th");
     var teams = [];
     for(let p of players){
-        if(!teams.includes(p.cells[3].innerHTML.trim()) && p.cells[1].innerHTML != "Team"){
+        if(!teams.includes(p.cells[3].innerHTML.trim()) && p.cells[1].innerHTML != "Player"){
             teams.push(p.cells[3].innerHTML.trim());
         }
     }
     for(let t of teams){
-        if(t in teamMedians){
-            var row = table.insertRow(-1);
-            for(let th of ths){
-                if(th.innerHTML == "Team"){
-                    var cell = row.insertCell(-1);
-                    cell.innerHTML = t;
-                }else{
-                    var cell = row.insertCell(-1);
-                    cell.innerHTML = '<input type="number" value="'+teamMedians[t][th.innerHTML]+'" class="slider" id="'+t+th.innerHTML+'Proj">';
-                }
-            }
-        }else{
-            var row = table.insertRow(-1);
-            for(let th of ths){
-                if(th.innerHTML == "Team"){
-                    var cell = row.insertCell(-1);
-                    cell.innerHTML = t;
-                }else{
-                    var cell = row.insertCell(-1);
-                    cell.innerHTML = '<input type="number" value="0" class="slider" id="'+t+th.innerHTML+'Proj">';
-                }
-            }
+        if(teamMedians[t] == undefined || t == "Team") continue; 
+        var row = table.insertRow(-1);
+        var cell = row.insertCell(-1);
+        cell.innerHTML = t;
+        row.insertCell(-1).innerHTML = "<input type='number' value='"+teamMedians[t]["Passing Yards"]+"' id='"+t+"Passing YardsProj'>";
+        row.insertCell(-1).innerHTML = "<input type='number' value='"+teamMedians[t]["Passing TDs"]+"' id='"+t+"Passing TDsProj'>";
+        row.insertCell(-1).innerHTML = "<input type='number' value='"+teamMedians[t]["Interceptions"]+"' id='"+t+"InterceptionsProj'>";
+        row.insertCell(-1).innerHTML = "<input type='number' value='"+teamMedians[t]["Receptions"]+"' id='"+t+"ReceptionsProj'>";
+        row.insertCell(-1).innerHTML = "<input type='number' value='"+teamMedians[t]["Receiving Yards"]+"' id='"+t+"Receiving YardsProj'>";
+        row.insertCell(-1).innerHTML = "<input type='number' value='"+teamMedians[t]["Receiving TDs"]+"' id='"+t+"Receiving TDsProj'>";
+        row.insertCell(-1).innerHTML = "<input type='number' value='"+teamMedians[t]["Rushing Yards"]+"' id='"+t+"Rushing YardsProj'>";
+        row.insertCell(-1).innerHTML = "<input type='number' value='"+teamMedians[t]["Rushing TDs"]+"' id='"+t+"Rushing TDsProj'>";
+        
+
+    }
+
+}
+
+// Get info from JSON file
+function getInfoFromJSON(file){
+    var json = {};
+    $.ajax({
+        'async': false,
+        'global': false,
+        'url': file,
+        'dataType': "json",
+        'success': function (data) {
+            json = data;
         }
+    });
+    return json;
+}
+
+// Replace team name with team abbreviation
+function teamNameToAbbrev(team){
+    switch(team){
+        case "Arizona Cardinals":
+            return "ARI";
+        case "Atlanta Falcons":
+            return "ATL";
+        case "Baltimore Ravens":
+            return "BAL";
+        case "Buffalo Bills":
+            return "BUF";
+        case "Carolina Panthers":
+            return "CAR";
+        case "Chicago Bears":
+            return "CHI";
+        case "Cincinnati Bengals":
+            return "CIN";
+        case "Cleveland Browns":
+            return "CLE";
+        case "Dallas Cowboys":
+            return "DAL";
+        case "Denver Broncos":
+            return "DEN";
+        case "Detroit Lions":
+            return "DET";
+        case "Green Bay Packers":
+            return "GB";
+        case "Houston Texans":
+            return "HOU";
+        case "Indianapolis Colts":
+            return "IND";
+        case "Jacksonville Jaguars":
+            return "JAX";
+        case "Kansas City Chiefs":
+            return "KC";
+        case "Los Angeles Chargers":
+            return "LAC";
+        case "Los Angeles Rams":
+            return "LAR";
+        case "Miami Dolphins":
+            return "MIA";
+        case "Minnesota Vikings":
+            return "MIN";
+        case "New England Patriots":
+            return "NE";
+        case "New Orleans Saints":
+            return "NO";
+        case "New York Giants":
+            return "NYG";
+        case "New York Jets":
+            return "NYJ";
+        case "Las Vegas Raiders":
+            return "LV";
+        case "Philadelphia Eagles":
+            return "PHI";
+        case "Pittsburgh Steelers":
+            return "PIT";
+        case "San Francisco 49ers":
+            return "SF";
+        case "Seattle Seahawks":
+            return "SEA";
+        case "Tampa Bay Buccaneers":
+            return "TB";
+        case "Tennessee Titans":
+            return "TEN";
+        case "Washington Commanders":
+            return "WAS";
     }
 }
 
@@ -1492,8 +1609,17 @@ function saveToFile(content, filename){
 function updateProjectionsFromMedians(){
     var players = document.getElementById("contestDataTable");
     var rows = players.rows;
-    var teamMedians = JSON.parse(localStorage.teamMedians);
-    var playerMedians = JSON.parse(localStorage.playerMedians);
+
+    var playerMedians = getInfoFromJSON('playerMedians.json');
+    var teamMedians = getInfoFromJSON('teamMedians.json');
+
+    for(let t of Object.keys(teamMedians)){
+        teamMedians[teamNameToAbbrev(t)] = teamMedians[t];
+        delete teamMedians[t];
+    }
+
+    //var teamMedians = JSON.parse(localStorage.teamMedians);
+    //var playerMedians = JSON.parse(localStorage.playerMedians);
     var ths = document.getElementById('teamMediansTable').getElementsByTagName('th');
     var categories = [];
     for(let th of ths){
@@ -1509,7 +1635,12 @@ function updateProjectionsFromMedians(){
             var teamProjections = teamMedians[team];
             var newProjections = {};
             for(let c of categories){
-                newProjections[c] = Number(playerProjections[c]) * Number(teamProjections[c])/100;
+                
+                if(playerProjections[c] == undefined || teamProjections[c] == undefined){
+                    newProjections[c] = 0;
+                } else{
+                    newProjections[c] = Number(playerProjections[c]) * Number(teamProjections[c])/100;
+                }
             }
             r.cells[9].setAttribute("projections", JSON.stringify(newProjections));
             r.cells[9].innerHTML = ((newProjections["Passing Yards"] * 0.04) + (newProjections["Passing TDs"] * 4) + (newProjections["Interceptions"] * -1) + (newProjections["Rushing Yards"] * 0.1) + (newProjections["Rushing TDs"] * 6) + (newProjections["Receptions"] * 1) + (newProjections["Receiving Yards"] * 0.1) + (newProjections["Receiving TDs"] * 6)).toFixed(1);
@@ -1519,9 +1650,13 @@ function updateProjectionsFromMedians(){
     
 }
 
-var DKSalaries = "";
-function handlecsv(){
-    var csv = document.getElementById("contestcsv").files[0];
+// Add event listener to dksalaries upload button to run handlecsv when file is loaded
+document.getElementById("dksalaries").addEventListener("change", function(){handlecsv("dksalaries")});
+
+
+//var DKSalaries = "";
+function handlecsv(element){
+    var csv = document.getElementById(element).files[document.getElementById(element).files.length-1];
     var reader = new FileReader();
     // save csv to storage as JSON
     reader.onload = function(e){
@@ -1539,7 +1674,9 @@ function handlecsv(){
         }
         //localStorage.contestData = JSON.stringify(result);
         //location.reload();
-        DKSalaries = JSON.stringify(result);
+        //DKSalaries = result;//JSON.stringify(result);
+        getContestData(result);
+
     }
     reader.readAsText(csv);
 
@@ -1552,10 +1689,9 @@ function handleTXT(name){
         var txt = e.target.result;
         localStorage[name] = txt;
         //return(JSON.parse(txt));
-        //console.log(JSON.parse(txt));
         getPlayerMedians();
         getTeamMedians();
-        location.reload();
+        //location.reload();
     }
     reader.readAsText(file);
 }
@@ -1577,7 +1713,6 @@ function downloadLineupsShowdown(){
                 position = "CPT";
             }
             var name = cell.split("<br>")[0].replace("CPT ", "").trim();
-            console.log(name);
             row.push(getIdFromUpload(name, position));
         }
         csv += row.join(",") + "\n";
@@ -1630,14 +1765,18 @@ function downloadLineups(){
 
 // Get player ID from upload based on name and position
 function getIdFromUpload(name, position){
-    var upload = JSON.parse(DKSalaries);
-    console.log(upload);
-    for(let p of upload){
-        if(p["Name"] == undefined) continue;
-        if(p["Name"].includes(name) && p["Roster Position"].includes(position)){
-            return p["ID"];
+    var table = document.getElementById("contestDataTable");
+    var rows = table.rows;
+    var found = false;
+    var x = 0;
+    while(!found){
+        if(rows[x].cells[1].innerHTML == name && rows[x].cells[2].innerHTML == position){
+            found = true;
+        }else{
+            x++;
         }
     }
+    return rows[x].cells[6].innerHTML;
 }
 
 // Place DKEntries into localStorage for use in builder
@@ -1691,12 +1830,10 @@ function downloadEditedLineupsShowdown(){
         var index = l.rowIndex;
         if(index > previousLineups.length) index = previousLineups.length;
         for(let i = 0; i < row.length; i++){
-            console.log(l.rowIndex);
-            //console.log(row[i]);
+
             previousLineups[index][i+4] = row[i];
         }
     }
-    //console.log(previousLineups);
     for(let l of previousLineups){
         csv += l.join(",") + "\n";
     }
@@ -1742,12 +1879,10 @@ function downloadEditedLineups(){
         var index = l.rowIndex;
         if(index > previousLineups.length) index = previousLineups.length;
         for(let i = 0; i < row.length; i++){
-            console.log(l.rowIndex);
-            //console.log(row[i]);
+
             previousLineups[index][i+4] = row[i];
         }
     }
-    //console.log(previousLineups);
     for(let l of previousLineups){
         csv += l.join(",") + "\n";
     }
@@ -1882,7 +2017,7 @@ function setDefenseProjections(){
     }
     var players = document.getElementById("contestDataTable").rows;
     for(let p of players){
-        if(p.cells[2].innerHTML == "DST"){
+        if(p.cells[2].innerHTML == "DST" || p.cells[2].getAttribute("defense") == "true"){
             p.cells[9].innerHTML = defenses[p.cells[3].innerHTML.trim()];
         }
         if(p.cells[2].innerHTML == "K"){
@@ -1972,6 +2107,7 @@ function updateInjuryTable(){
 // Get injury table from storage
 function getInjuryTable(){
     var table = document.getElementById("injuryTable");
+    if(localStorage.injuries == undefined) return;
     var injuries = JSON.parse(localStorage.injuries);
     for(let i of injuries){
         var row = table.insertRow(-1);
@@ -1993,6 +2129,7 @@ function getInjuryTable(){
 // Update projections based on injuries
 function adjustProjectionsByInjuries(){
     var players = document.getElementById("contestDataTable").rows;
+    if(localStorage.injuries == undefined) return;
     var injuries = JSON.parse(localStorage.injuries);
     var playerMedians = document.getElementById("playerMediansTable").rows;
 
@@ -2003,7 +2140,7 @@ function adjustProjectionsByInjuries(){
                 
                 var ths = document.getElementById("playerMediansTable").getElementsByTagName("th");
                 for(let t of ths){
-                    if(["Image", "Name", "Position", "Team"].includes(t.innerHTML)) continue;
+                    if(["Game", "Name", "Position", "Team"].includes(t.innerHTML)) continue;
                     var slider = document.getElementById(m.cells[1].innerHTML.trim()+t.innerHTML+"Slider");
                     medianProjections[t.innerHTML] = slider.value;
                 }
@@ -2018,6 +2155,7 @@ function adjustProjectionsByInjuries(){
                 x++;
             }
         }
+        if(!found) continue;
         var playerProjections = JSON.parse(players[x].cells[9].getAttribute("projections"));
         
         for(let r in players){
@@ -2088,4 +2226,28 @@ function reloadPage(){
 function clearInjuries(){
     localStorage.injuries = JSON.stringify([]);
     location.reload();
+}
+
+function clearOldData(){
+    var table = document.getElementById("contestDataTable");
+    var rows = table.rows;
+    var now = new Date();
+    for(let i=0; i<rows.length; i++){
+        let time = new Date(rows[i].cells[8].innerHTML.split(" ")[1]);
+        if(time < now){
+            table.deleteRow(i);
+            i--;
+        }
+    }
+}
+
+// multiply projection for captains by 1.5
+function captainize(){
+    var table = document.getElementById("contestDataTable");
+    var rows = table.rows;
+    for(let r of rows){
+        if(r.cells[2].innerHTML == "CPT"){
+            r.cells[9].innerHTML = (r.cells[9].innerHTML * 1.5).toFixed(1);
+        }
+    }
 }
