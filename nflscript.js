@@ -2300,7 +2300,7 @@ function clearOldData(){
     var now = new Date();
     var y = now.getFullYear();
     var m = Number(now.getMonth())+1;
-    var d = now.getDate();
+    var d = Number(now.getDate())+1;
     var date = y+"-"+m+"-"+d;
     for(let i=0; i<rows.length; i++){
         let time = new Date(rows[i].cells[8].innerHTML.split(" ")[1]);
