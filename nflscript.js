@@ -252,8 +252,8 @@ function fillPlayerData(){
             var yardsEffect = "";
             for(let r of defensesRows){
                 if(r.cells[1].innerHTML == cells[4].innerHTML){
-                    scoringEffect += r.cells[5].innerHTML;
-                    yardsEffect += r.cells[6].innerHTML;
+                    scoringEffect += r.cells[6].innerHTML;
+                    yardsEffect += r.cells[7].innerHTML;
                 }
             }
             playerSummary.rows[3].cells[1].innerHTML += "<br>Scoring Allowed Compared to Average: " + Number(scoringEffect).toFixed(2) + "<br>Yards Allowed Compared to Average: " + Number(yardsEffect).toFixed(2);
@@ -2298,9 +2298,13 @@ function clearOldData(){
     var table = document.getElementById("contestDataTable");
     var rows = table.rows;
     var now = new Date();
+    var y = now.getFullYear();
+    var m = Number(now.getMonth())+1;
+    var d = now.getDate();
+    var date = y+"-"+m+"-"+d;
     for(let i=0; i<rows.length; i++){
         let time = new Date(rows[i].cells[8].innerHTML.split(" ")[1]);
-        if(time < now){
+        if(time < date){
             table.deleteRow(i);
             i--;
         }
