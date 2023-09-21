@@ -19,10 +19,10 @@
             <button id="contestInfo" class="tabButton">Contest Info</button>
             <button id="defensesInfo" class="tabButton">Defense Info</button>
             <button id="teamInfo" class="tabButton">Team Info</button>
-            <button id="builderInfo" class="tabButton">Builder</button>
-            <button id="setPlayerMediansInfo" class="tabButton">Set Player Medians</button>
-            <button id="setTeamMediansInfo" class="tabButton">Set Team Medians</button>
-            <button id="injuriesInfo" class="tabButton">Injury Info</button>
+            <button id="builderInfo" class="tabButton">Lineup Builder</button>
+            <button id="setPlayerMediansInfo" class="tabButton">Player Medians</button>
+            <button id="setTeamMediansInfo" class="tabButton">Team Medians</button>
+            <button id="injuriesInfo" class="tabButton">Injuries</button>
         </div>
         <div id="contest" class="contestDiv tabContent" style="display:block;width:100%">
             <div class="sectionHeader">
@@ -188,8 +188,8 @@
             <div class="sectionHeader">
                 <h4>Team Data</h4>
             </div>    
-        
-            <button onclick="populateTeamInfo()">Update Team Data</button>            
+            <!-- Deprecating since this runs automatically now on load -->
+            <!--<button onclick="populateTeamInfo()">Update Team Data</button> -->           
             <table id="teamTable" class="tablesorter">
                 <tr>
                     <th>Team</th>
@@ -218,13 +218,13 @@
             </div>
             <div id="builderControl" class="sectionHeader">
                 Lineups to build: <input type="number" id="lineupsToBuild" value="20" min="1">
-                <button class="buildLineups classicBuilder" onclick="buildLineups()">Build Lineups</button><button class="buildLineups showdownBuilder" onclick="buildShowdownLineups()" style="display:none">Build Lineups</button>
+                <button class="buildLineups classicBuilder" onclick="buildLineups()">Build Lineups</button><button class="buildLineups showdownBuilder" onclick="buildShowdownLineups()" style="display:none">Build Lineups</button><button onclick="clearLineups()">Clear Lineups</button>
                 <br><text class="classicBuilder">Min stack (not including QB): </text><input class="classicBuilder" type="number" id="minStack" value="1" min="0" max="4">
                 <br><text class="classicBuilder">Max stack (not including QB): </text><input class="classicBuilder" type="number" id="maxStack" value="2" min="0" max="4">
                 <!-- Have user upload .csv of contest info they want to build for -->
                 <div class="csvSection">
                     <!--<label style="float:none" for="contestcsv">Import salaries: </label><input type="file" name="contestcsv" id="contestcsv" oninput="handlecsv('contestcsv')">-->
-                    <button onclick="downloadLineupsShowdown()" style="display:none" class="downloadLineupsButton showdownBuilder">Download Lineups for Initial Upload</button><button onclick="downloadLineups()" class="downloadLineupsButton classicBuilder">Download Lineups for Initial Upload</button><button style="float:right" onclick="clearLineups()">Clear Lineups</button>
+                    <button onclick="downloadLineupsShowdown()" style="display:none" class="downloadLineupsButton showdownBuilder">Download Lineups for Initial Upload</button><button onclick="downloadLineups()" class="downloadLineupsButton classicBuilder">Download Lineups for Initial Upload</button>
                 </div>
                 <div class="csvSection">
                     <label style="float:none" for="editcsv">Lineups for edit: </label><input type="file" name="editcsv" id="editcsv" oninput="handleLineupscsv()">
@@ -271,7 +271,8 @@
         </div>
         <div id="setPlayerMedians" class="tabContent" style="display:none">
             <div class="sectionHeader">
-                <h4>Set player medians - percent of team's total</h4>
+                <h4>Player medians - percent of team's total</h4>
+                <h4>Updates will affect projections until browser is reloaded</h4>
                 <select id="teamSelectMedians" onchange="filterTeamsMedians()"><option value="All teams">All teams</option></select>
             </div>
             <div>
@@ -300,12 +301,14 @@
             </div>
             <div class="sectionHeader">
         <!-- Let user input player medians to be used to generate default projections in contestTableData-->
-            <button onclick="getPlayerMedians()">Get Player Medians</button>
+        <!-- Deprecating - should no longer be needed -->
+
+        <!--    <button onclick="getPlayerMedians()">Get Player Medians</button>
             <button onclick="updatePlayerMedians()">Save</button>
             <button onclick="updateProjectionsFromMedians()">Update Projections</button>
             
                 <h4>If data does not preload, upload here</h4>
-                <label style="width:auto" for="playerMedians">Upload From File:</label><input type="file" name="playerMedians" id="playerMedians" oninput="handleTXT('playerMedians')">
+                <label style="width:auto" for="playerMedians">Upload From File:</label><input type="file" name="playerMedians" id="playerMedians" oninput="handleTXT('playerMedians')">-->
             </div>
             <table id="playerMediansTable" class="tablesorter">
                     <tr>
@@ -327,12 +330,13 @@
         </div>
         <div id="setTeamMedians" class="tabContent" style="display:none">
             <div class="sectionHeader">
-                <h4>Set team medians</h4>
+                <h4>Team medians</h4>
+                <!-- Deprecating - should no longer be needed 
                 <button onclick="updateTeamMedians()">Save</button>
                 <div style="margin-top:10px">
                     <h4>If data does not preload, upload here</h4>
                     <label style="width:auto" for="teamMedians">Upload From File:</label><input type="file" name="teamMedians" id="teamMedians" oninput="handleTXT('teamMedians')">
-                </div>
+                </div>-->
             </div>
             <table id="teamMediansTable">
                 <thead>
