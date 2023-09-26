@@ -190,8 +190,10 @@ function loadTableData(){
             if(j == 10){
                 if(tableData[i][j] == "true") {
                     row.cells[2].setAttribute("defense", "true");
+                    row.cells[2].setAttribute("pos", "DST");
                 } else if(tableData[i][j] == "kicker"){ 
                     row.cells[2].setAttribute("kicker", "kicker");
+                    row.cells[2].setAttribute("pos", "K");
                 } else {
                     if(row.length == 11) row.cells[2].setAttribute("pos", tableData[i][j]); else row.cells[2].setAttribute("pos", tableData[i][j+1]);
                 }
@@ -748,26 +750,12 @@ localStorage.lineups = "";
 
 // Solve a draftkings lineup for a given contest start time
 function buildLineups(){
-    var contestDataTable = document.getElementById("contestDataTable");
     var contestTime = document.getElementById("select").value;
     if(contestTime == "All slates") alert("Please select a slate"); else{
         var lineupsToBuild = Number(document.getElementById("lineupsToBuild").value);
+        localStorage.notFeasible = 0; 
         for(let i = 0; i < lineupsToBuild; i++){
-            var players = [];
-            for(let r of contestDataTable.rows){
-                if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position")){
-                    var player = {name: r.cells[1].innerHTML, id: r.cells[6].innerHTML, position: r.cells[2].innerHTML, team: r.cells[3].innerHTML, opponent: r.cells[4].innerHTML, salary: r.cells[5].innerHTML, proj: randomizeProjection(r.cells[9].innerHTML, r.cells[2].innerHTML)};
-                    players.push(player);
-                }
-            }
-            players = correlateByTeam(players);
-            let promise = new Promise(function(resolve) {
-                optimizeClassic(players);
-                resolve();
-            });
-            promise.then(function(){
-                document.getElementById("lineupTable").lastElementChild.innerHTML = localStorage.lineups;
-            });
+            optimizeClassic(generateProjections());
         }
     }
 }
@@ -775,7 +763,7 @@ function buildLineups(){
 // Randomize projection
 function randomizeProjection(proj, position){
     var variance = Number(document.getElementById("varianceValue").innerHTML.trim());
-
+    if(proj <= 0) return 0;
     // curveLean is how much the curve leans away from the mean; 
     // under .5 means it leans right, over .5 means it leans left
     var curveLean = 0.5;
@@ -814,7 +802,8 @@ function randomizeProjection(proj, position){
 
     var thisProj = Number(proj);
     variance = (variance*varianceStrength+thisProj*.5)*(rand-curveLean); // variance is higher for higher projections; manipulated by randomness and curveLean
-    if(thisProj <= 0) return 0;
+    if(thisProj <= 0) return 0.5;
+    
     return (thisProj+variance).toFixed(1);
 }
 
@@ -931,26 +920,34 @@ function optimizeClassic(players){
         }
         results = solver.Solve(model);
         // make sure it's not already in our lineups
-        
-        var alreadyBuilt = false;
-        var thisLineup = [];
-        for(let k of Object.keys(results)){
-            if(k != "feasible" && k != "result" && k != "bounded" && k != "iterations" && k != "time" && k != "dual" && k != "primal" && k != "isIntegral"){
-                var x=0;
-                while(x < players.length){
-                    if(players[x].name.trim() == k.trim()){ 
-                        thisLineup.push(players[x].name); 
-                    } 
-                    x++;
+        if(!results.feasible) {
+            if(localStorage.notFeasible == undefined) localStorage.notFeasible = 1; else localStorage.notFeasible = Number(localStorage.notFeasible)++;
+            if(Number(localStorage.notFeasible) > 10) {
+                alert("No more lineups available");
+                return;
+            } else optimizeClassic(generateProjections());
+        } else {
+            console.log(results);
+            var alreadyBuilt = false;
+            var thisLineup = [];
+            for(let k of Object.keys(results)){
+                if(k != "feasible" && k != "result" && k != "bounded" && k != "iterations" && k != "time" && k != "dual" && k != "primal" && k != "isIntegral"){
+                    var x=0;
+                    while(x < players.length){
+                        if(players[x].name.trim() == k.trim()){ 
+                            thisLineup.push(players[x].name); 
+                        } 
+                        x++;
+                    }
+                    thisLineup = sortArray(thisLineup);
                 }
-                thisLineup = sortArray(thisLineup);
             }
+            var builtLineups = getBuiltLineups();
+            for(let l of builtLineups){
+                if(l == thisLineup) alreadyBuilt = true;
+            }
+            if(!alreadyBuilt && thisLineup.length == 9) setTimeout(addLineup(results, players), 500); else(optimizeClassic(generateProjections()));
         }
-        var builtLineups = getBuiltLineups();
-        for(let l of builtLineups){
-            if(l == thisLineup) alreadyBuilt = true;
-        }
-        if(!alreadyBuilt && thisLineup.length == 9) setTimeout(addLineup(results, players), 100); else(optimizeClassic(players));
     });
 
 }
@@ -1042,7 +1039,38 @@ function addLineup(lineup,players){
     row.insertCell(-1).innerHTML = totalSalary;
     row.insertCell(-1).innerHTML = totalProj.toFixed(1);
     //return row.innerHTML;
+    document.getElementById("lineupsBuilt").innerHTML = document.getElementById("lineupTable").rows.length - 1;
+
+    updateOwnership();
 }
+
+// Calculate player ownership based on lineups built and add to ownership table
+function updateOwnership(){
+    var ownershipTable = document.getElementById("ownership");
+    var lineupTable = document.getElementById("lineupTable");
+    var rows = lineupTable.rows;
+    var players = {};
+    for(let r of rows){
+        if(r.cells[0].innerHTML == "QB") continue;
+        for(let i = 0; i < 9; i++){
+            let player = r.cells[i].innerHTML.split("<br>")[0];
+            if(players[player] == undefined){
+                players[player] = 1;
+            }else{
+                players[player]++;
+            }
+        }
+    }
+    ownershipTable.innerHTML = "<tr><th>Player</th><th>Ownership</th></tr>";
+
+    for(let p of Object.keys(players)){
+        var row = ownershipTable.insertRow(-1);
+        row.insertCell(0).innerHTML = p;
+        row.insertCell(1).innerHTML = players[p];
+    }
+    sortTable("ownership", 1);
+}
+
 
 // Toggle elements based on contest type
 function pickBuilder(section){
@@ -1072,29 +1100,12 @@ function pickBuilder(section){
 
 // Create a showdown lineup for a given contest start time
 function buildShowdownLineups(){
-    
-    var contestDataTable = document.getElementById("contestDataTable");
     var contestTime = document.getElementById("select").value;
     var lineupsToBuild = Number(document.getElementById("lineupsToBuild").value);
     if(contestTime == "All slates") alert("Please select a slate"); else{
-
-            for(let i = 0; i < lineupsToBuild; i++){
-            var players = [];
-
-            for(let r of contestDataTable.rows){
-                if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position")){
-                    var player = {name: r.cells[1].innerHTML, id: r.cells[6].innerHTML, position: r.cells[2].innerHTML, team: r.cells[3].innerHTML, opponent: r.cells[4].innerHTML, salary: r.cells[5].innerHTML, proj: randomizeProjection(r.cells[9].innerHTML, r.cells[2].innerHTML)};
-                    players.push(player);
-                }
-            }
-            players = correlateByTeam(players);
-            let promise = new Promise(function(resolve) {
-                optimizeShowdown(players);
-                resolve();
-            });
-            promise.then(function(){
-                document.getElementById("showdownLineupTable").lastElementChild.innerHTML = localStorage.lineups;
-            });
+        localStorage.notFeasible = 0;
+        for(let i = 0; i < lineupsToBuild; i++){
+            optimizeShowdown(generateProjections());
         }   
     }
 }
@@ -1108,6 +1119,10 @@ function generateProjections(){
     for(let r of contestDataTable.rows){
         if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position")){
             var player = {name: r.cells[1].innerHTML, id: r.cells[6].innerHTML, position: r.cells[2].innerHTML, team: r.cells[3].innerHTML, opponent: r.cells[4].innerHTML, salary: r.cells[5].innerHTML, proj: randomizeProjection(r.cells[9].innerHTML, r.cells[2].innerHTML)};
+            if(player.position == "FLEX" || player.position == "CPT"){
+                player.rosterPosition = player.position;
+                player.position = r.cells[2].getAttribute("pos");
+            }
             players.push(player);
         }
     }
@@ -1164,7 +1179,7 @@ function optimizeShowdown(players){
         let t = p.team;
         if(!teams.includes(t)) teams.push(t);
                 
-        if(p.position == "CPT"){
+        if(p.rosterPosition == "CPT"){
             modelVariables["CPT " + n] = {"proj": p.proj, "salary": p.salary, "CPT": '1', "i": '1'};
             modelVariables["CPT " + n][n] = '1';
             modelVariables["CPT " + n][t] = '1';
@@ -1205,31 +1220,39 @@ function optimizeShowdown(players){
         results = solver.Solve(model);
         // make sure it's not already in our lineups
 
-        var alreadyBuilt = false;
-        var thisLineup = [];
-        var cpt = "";
-        for(let k of Object.keys(results)){
-            if(k != "feasible" && k != "result" && k != "bounded" && k != "iterations" && k != "time" && k != "dual" && k != "primal" && k != "isIntegral"){
-                var x=0;
-                while(x < players.length){
-                    if(players[x].name.trim() === k.trim()){ 
-                        thisLineup.push(players[x].name); 
-                    } else if(players[x].name.trim() === k.replace("CPT ", "").trim()){
-                        cpt = players[x].name;
-                    } 
-                    x++;
+        if(!results.feasible) {
+            if(localStorage.notFeasible == undefined) localStorage.notFeasible = 1; else localStorage.notFeasible = Number(localStorage.notFeasible)++;
+            if(Number(localStorage.notFeasible) > 10) {
+                alert("No more lineups available");
+                return;
+            } else optimizeClassic(generateProjections());
+        } else {
+            var alreadyBuilt = false;
+            var thisLineup = [];
+            var cpt = "";
+            for(let k of Object.keys(results)){
+                if(k != "feasible" && k != "result" && k != "bounded" && k != "iterations" && k != "time" && k != "dual" && k != "primal" && k != "isIntegral"){
+                    var x=0;
+                    while(x < players.length){
+                        if(players[x].name.trim() === k.trim()){ 
+                            thisLineup.push(players[x].name); 
+                        } else if(players[x].name.trim() === k.replace("CPT ", "").trim()){
+                            cpt = players[x].name;
+                        } 
+                        x++;
+                    }
+                    
                 }
-                
             }
+            thisLineup = sortArray(thisLineup);
+            thisLineup.push(cpt);
+            //thisLineup = JSON.stringify(thisLineup);
+            var builtLineups = getBuiltShowdownLineups();
+            for(let l of builtLineups){
+                if(JSON.stringify(l) == JSON.stringify(thisLineup)) alreadyBuilt = true;
+            }
+            if(!alreadyBuilt && thisLineup.length == 6) setTimeout(addLineupShowdown(results, players), 100); else(optimizeShowdown(generateProjections()));
         }
-        thisLineup = sortArray(thisLineup);
-        thisLineup.push(cpt);
-        //thisLineup = JSON.stringify(thisLineup);
-        var builtLineups = getBuiltShowdownLineups();
-        for(let l of builtLineups){
-            if(JSON.stringify(l) == JSON.stringify(thisLineup)) alreadyBuilt = true;
-        }
-        if(!alreadyBuilt) setTimeout(addLineupShowdown(results, players), 100); else(optimizeShowdown(generateProjections()));
     });
 }
 // Sort array alphabetically - using to compare lineups to see if they're already built
@@ -1304,12 +1327,12 @@ function addLineupShowdown(lineup,players){
             while(!found && x < players.length){
                 if(players[x].name.trim() == k.replace("CPT ", "").trim()) {
                     if(k.includes("CPT")){
-                        if(players[x]["position"] == 'CPT'){
+                        if(players[x]["rosterPosition"] == 'CPT'){
                             found = true; 
                             lineupForTable.push(players[x]);
                         } else x++;
                     }else{
-                        if(players[x]["position"] != 'CPT'){
+                        if(players[x]["rosterPosition"] != 'CPT'){
                             found = true; 
                             lineupForTable.push(players[x]);
                         } else x++;
@@ -1318,6 +1341,7 @@ function addLineupShowdown(lineup,players){
             }
 
         }
+        
     }
     
     // order lineupForTable by position
@@ -1326,7 +1350,7 @@ function addLineupShowdown(lineup,players){
     var totalProj =0;
     var totalSalary = 0;
     for(let p of lineupForTable){
-        if(p.position == "CPT"){
+        if(p.rosterPosition == "CPT"){
             cpts.push(p);
         }else{
             flexs.push(p);
@@ -1349,6 +1373,52 @@ function addLineupShowdown(lineup,players){
     }
     row.insertCell(-1).innerHTML = totalSalary;
     row.insertCell(-1).innerHTML = totalProj.toFixed(1);
+
+    // Update ShowdownLineupsBuilt to num rows -1
+    document.getElementById("showdownLineupsBuilt").innerHTML = lineupTable.rows.length-1;
+
+    updateShowdownOwnership();
+}
+
+// Update ownership for showdown lineups
+function updateShowdownOwnership(){
+    var table = document.getElementById("showdownLineupTable");
+    var rows = table.rows;
+    
+    var players ={};
+    for(let r of rows){
+        if(r.rowIndex == 0) continue;
+        for(let i = 1; i < 6; i++){
+            let name = r.cells[i].innerHTML.split("<br>")[0];
+            if(!Object.keys(players).includes(name)) {
+                // Create object with key 'name' and values 'flex' and 'cpt'
+                players[name] = {"flex":1, "cpt": 0};
+            } else{
+                players[name]["flex"]++;
+            }
+        }
+        let cpt = r.cells[0].innerHTML.split("<br>")[0];
+        if(!Object.keys(players).includes(cpt)){
+            // Create object with key 'name' and values 'flex' and 'cpt'
+            players[cpt] = {"flex": 0, "cpt": 1};            
+        } else{
+            players[cpt]["cpt"]++;
+        }
+    }
+    var ownershipTable = document.getElementById("showdownOwnership");
+    while(ownershipTable.rows.length > 1){
+        ownershipTable.deleteRow(-1);
+    }
+    for(let p of Object.keys(players)){
+        if(players[p].flex > 0 || players[p].cpt > 0){
+            var row = ownershipTable.insertRow(-1);
+            row.insertCell(-1).innerHTML = p;
+            row.insertCell(-1).innerHTML = (players[p].cpt/table.rows.length*100).toFixed(1);
+            row.insertCell(-1).innerHTML = (players[p].flex/table.rows.length*100).toFixed(1);
+            row.insertCell(-1).innerHTML = ((players[p].cpt+players[p].flex)/table.rows.length*100).toFixed(1);
+        }
+    }
+    sortTable("showdownOwnership", 3);
 }
 
 // Add variance to lineup builder based on slider value
@@ -1818,8 +1888,9 @@ function getIdFromUpload(name, position){
     var rows = table.rows;
     var found = false;
     var x = 0;
+    console.log(name, position);
     while(!found){
-        if(rows[x].cells[1].innerHTML == name && rows[x].cells[2].innerHTML == position){
+        if(rows[x].cells[1].innerHTML == name && (rows[x].cells[2].innerHTML == position || (position == "FLEX" && (rows[x].cells[2].innerHTML == "RB" || rows[x].cells[2].innerHTML == "WR" || rows[x].cells[2].innerHTML == "TE")))){
             found = true;
         }else{
             x++;
@@ -2344,6 +2415,6 @@ async function captainize(){
     resolve();
     });
     
-    promise.then(() => sortTable("contestDataTable", 9)).then(() => populateTeamInfo());
+    promise.then(() => {sortTable("contestDataTable", 9)}).then(() => {populateTeamInfo()});
 
 }

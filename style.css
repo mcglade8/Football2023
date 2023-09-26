@@ -80,6 +80,7 @@ body{
     overflow-y: auto;
     width: 50%;
     height:100vh;
+    background: #eeeeee;
 }
 .sectionHeader{
     width: 100%;
@@ -116,7 +117,7 @@ h4{
 }
 .builderSection{
     width: 100%;
-    height: 100%;
+    height: 100vh;
     background: #eeeeee;
     color: black;
     padding: 10px;

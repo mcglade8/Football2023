@@ -232,41 +232,72 @@
                 </div>
             </div>
             <div id="Classic" class="builderSection classicBuilder">
-                <table id="lineupTable">
-                    <thead>
-                        <th>QB</th>
-                        <th>RB1</th>
-                        <th>RB2</th>
-                        <th>WR1</th>
-                        <th>WR2</th>
-                        <th>WR3</th>
-                        <th>TE</th>
-                        <th>FLEX</th>
-                        <th>DST</th>
-                        <th>Salary</th>
-                        <th>Projection</th>
-                    </thead>
-                    <tbody>
-                        
-                    </tbody>
-                </table>
+                <div class="splitScreen">
+                    Lineups built: <text id="lineupsBuilt">0</text>
+                    
+                    <table id="lineupTable">
+                        <thead>
+                            <th>QB</th>
+                            <th>RB1</th>
+                            <th>RB2</th>
+                            <th>WR1</th>
+                            <th>WR2</th>
+                            <th>WR3</th>
+                            <th>TE</th>
+                            <th>FLEX</th>
+                            <th>DST</th>
+                            <th>Salary</th>
+                            <th>Projection</th>
+                        </thead>
+                        <tbody>
+                            
+                        </tbody>
+                    </table>
+                </div>
+                <div class="splitScreen">
+                    <table id="ownership">
+                        <thead>
+                            <th>Player</th>
+                            <th>Own %</th>
+                        </thead>
+                        <tbody>
+                            
+                        </tbody>
+                    </table>
+                </div>  
             </div>
-            <div id="Showdown" style="display:none" class="builderSection showdownBuilder">
-                <table id="showdownLineupTable">
-                    <thead>
-                        <th>Captain</th>
-                        <th>Flex1</th>
-                        <th>Flex2</th>
-                        <th>Flex3</th>
-                        <th>Flex4</th>
-                        <th>Flex5</th>
-                        <th>Salary</th>
-                        <th>Projection</th>
-                    </thead>
-                    <tbody>
-                        
-                    </tbody>
-                </table>
+            <div id="Showdown" style="display:none; margin-top: 10px" class="builderSection showdownBuilder">
+                <div class="splitScreen">
+                    Lineups built: <text id="showdownLineupsBuilt">0</text>
+                    <table id="showdownLineupTable">
+                        <thead>
+                            <th>Captain</th>
+                            <th>Flex1</th>
+                            <th>Flex2</th>
+                            <th>Flex3</th>
+                            <th>Flex4</th>
+                            <th>Flex5</th>
+                            <th>Salary</th>
+                            <th>Projection</th>
+                        </thead>
+                        <tbody>
+                            
+                        </tbody>
+                    </table>
+                </div>
+                <div class="splitScreen">
+                    <table id="showdownOwnership">
+                        <thead>
+                            <th>Player</th>
+                            <th>CPT Own %</th>
+                            <th>FLEX Own %</th>
+                            <th>Total Own %</th>
+                        </thead>
+                        <tbody>
+                            
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
         <div id="setPlayerMedians" class="tabContent" style="display:none">
