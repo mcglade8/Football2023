@@ -23,6 +23,7 @@
             <button id="setPlayerMediansInfo" class="tabButton">Player Medians</button>
             <button id="setTeamMediansInfo" class="tabButton">Team Medians</button>
             <button id="injuriesInfo" class="tabButton">Injuries</button>
+            <button id="stealInfo" class="tabButton">Steal Usage</button>
         </div>
         <div id="contest" class="contestDiv tabContent" style="display:block;width:100%">
             <div class="sectionHeader">
@@ -401,6 +402,30 @@
                     <th>Beneficiary 3 | Percent</th>
                     <th>Beneficiary 4 | Percent</th>
                     <th>Beneficiary 5 | Percent</th>
+                    <th>Remove</th>
+                </thead>
+                <tbody>
+                    
+                </tbody>
+            </table>
+        </div>
+        <div id="steal" class="tabContent" style="display:none">
+            <div class="sectionHeader">
+                <h3>Steal Usage</h3>
+                <h4>Put the benefitting player in the first column, steal their usage (percentage-wise) from their teammates.<br>Teammate allocation should be "Player Name" | "Percent allocation" (0-100)</h4>
+            </div>
+            <button onclick="addSteal()">Add row</button>
+            <button onclick="reloadPage()">Save</button>
+            <button onclick="clearSteal()">Clear</button>
+            <table id="stealTable" class="tablesorter">
+                <thead>
+                    <th>Beneficiary</th>
+                    <th>Steal 1 | Percent</th>
+                    <th>Steal 2 | Percent</th>
+                    <th>Steal 3 | Percent</th>
+                    <th>Steal 4 | Percent</th>
+                    <th>Steal 5 | Percent</th>
+                    <th>Remove</th>
                 </thead>
                 <tbody>
                     

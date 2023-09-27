@@ -132,9 +132,11 @@ $(function() {
     colorTableRows();
     getPlayerMedians();
     getInjuryTable();
+    getStealTable();
     getDefenseProjections();
     updateProjectionsFromMedians();
     adjustProjectionsByInjuries();
+    adjustProjectionsByStolen();
     captainize();
 
 });
@@ -927,7 +929,6 @@ function optimizeClassic(players){
                 return;
             } else optimizeClassic(generateProjections());
         } else {
-            console.log(results);
             var alreadyBuilt = false;
             var thisLineup = [];
             for(let k of Object.keys(results)){
@@ -1888,7 +1889,7 @@ function getIdFromUpload(name, position){
     var rows = table.rows;
     var found = false;
     var x = 0;
-    console.log(name, position);
+    //console.log(name, position);
     while(!found){
         if(rows[x].cells[1].innerHTML == name && (rows[x].cells[2].innerHTML == position || (position == "FLEX" && (rows[x].cells[2].innerHTML == "RB" || rows[x].cells[2].innerHTML == "WR" || rows[x].cells[2].innerHTML == "TE")))){
             found = true;
@@ -2232,7 +2233,8 @@ function addInjured(){
     cell.innerHTML = '<input type="text" class="injuryB4 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB4Pct injury" onchange="updateInjuryTable()">';
     cell = row.insertCell(-1);
     cell.innerHTML = '<input type="text" class="injuryB5 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB5Pct injury" onchange="updateInjuryTable()">';
-    
+    cell = row.insertCell(-1);
+    cell.innerHTML = '<button onclick="removeRow(this)">Remove</button>'
 }
 
 // Update injury table based on input
@@ -2417,4 +2419,193 @@ async function captainize(){
     
     promise.then(() => {sortTable("contestDataTable", 9)}).then(() => {populateTeamInfo()});
 
+}
+
+//// !----- ~~~~ Modifying injury information to the opposite effect for steal mode ~~~~ -----! ////
+
+// Add a row to steal table to allocate steal designation and beneficiaries
+function addSteal(){
+    var table = document.getElementById("stealTable");
+    var row = table.insertRow(-1);
+    var cell = row.insertCell(-1);
+    cell.innerHTML = '<input type="text" class="stealName steal" onchange="updatestealTable()">';
+    cell = row.insertCell(-1);
+    cell.innerHTML = '<input type="text" class="stealB1 steal" onchange="updatestealTable()"><input type="number" class="stealB1Pct steal" onchange="updatestealTable()">';
+    cell = row.insertCell(-1);
+    cell.innerHTML = '<input type="text" class="stealB2 steal" onchange="updatestealTable()"><input type="number" class="stealB2Pct steal" onchange="updatestealTable()">';
+    cell = row.insertCell(-1);
+    cell.innerHTML = '<input type="text" class="stealB3 steal" onchange="updatestealTable()"><input type="number" class="stealB3Pct steal" onchange="updatestealTable()">';
+    cell = row.insertCell(-1);
+    cell.innerHTML = '<input type="text" class="stealB4 steal" onchange="updatestealTable()"><input type="number" class="stealB4Pct steal" onchange="updatestealTable()">';
+    cell = row.insertCell(-1);
+    cell.innerHTML = '<input type="text" class="stealB5 steal" onchange="updatestealTable()"><input type="number" class="stealB5Pct steal" onchange="updatestealTable()">';
+    cell = row.insertCell(-1);
+    cell.innerHTML = '<button onclick="removeRow(this)">Remove</button>'
+    
+}
+
+// Remove button for steal table and injury table deletes row
+function removeRow(button){
+    var row = button.parentNode.parentNode;
+    row.parentNode.removeChild(row);
+}
+
+// Update steal table based on input
+function updatestealTable(){
+    var table = document.getElementById("stealTable");
+    var rows = table.rows;
+    var stolen = [];
+    for(let r of rows){
+        if(r.rowIndex == 0) continue;
+        var steal = {};
+        steal.name = r.cells[0].children[0].value;
+        steal.b1 = r.cells[1].children[0].value;
+        steal.b1Pct = r.cells[1].children[1].value;
+        steal.b2 = r.cells[2].children[0].value;
+        steal.b2Pct = r.cells[2].children[1].value;
+        steal.b3 = r.cells[3].children[0].value;
+        steal.b3Pct = r.cells[3].children[1].value;
+        steal.b4 = r.cells[4].children[0].value;
+        steal.b4Pct = r.cells[4].children[1].value;
+        steal.b5 = r.cells[5].children[0].value;
+        steal.b5Pct = r.cells[5].children[1].value;
+        stolen.push(steal);
+    }
+    localStorage.stolen = JSON.stringify(stolen);
+}
+
+// Get steal table from storage
+function getStealTable(){
+    var table = document.getElementById("stealTable");
+    if(localStorage.stolen == undefined) return;
+    var stolen = JSON.parse(localStorage.stolen);
+    for(let i of stolen){
+        var row = table.insertRow(-1);
+        var cell = row.insertCell(-1);
+        cell.innerHTML = '<input type="text" class="stealName steal" onchange="updatestealTable()" value="'+i.name+'">';
+        cell = row.insertCell(-1);
+        cell.innerHTML = '<input type="text" class="stealB1 steal" onchange="updatestealTable()" value="'+i.b1+'"><input type="number" class="stealB1Pct steal" onchange="updatestealTable()" value="'+i.b1Pct+'">';
+        cell = row.insertCell(-1);
+        cell.innerHTML = '<input type="text" class="stealB2 steal" onchange="updatestealTable()" value="'+i.b2+'"><input type="number" class="stealB2Pct steal" onchange="updatestealTable()" value="'+i.b2Pct+'">';
+        cell = row.insertCell(-1);
+        cell.innerHTML = '<input type="text" class="stealB3 steal" onchange="updatestealTable()" value="'+i.b3+'"><input type="number" class="stealB3Pct steal" onchange="updatestealTable()" value="'+i.b3Pct+'">';
+        cell = row.insertCell(-1);
+        cell.innerHTML = '<input type="text" class="stealB4 steal" onchange="updatestealTable()" value="'+i.b4+'"><input type="number" class="stealB4Pct steal" onchange="updatestealTable()" value="'+i.b4Pct+'">';
+        cell = row.insertCell(-1);
+        cell.innerHTML = '<input type="text" class="stealB5 steal" onchange="updatestealTable()" value="'+i.b5+'"><input type="number" class="stealB5Pct steal" onchange="updatestealTable()" value="'+i.b5Pct+'">';
+    }
+}
+
+// Update projections based on injuries
+function adjustProjectionsByStolen(){
+    var players = document.getElementById("contestDataTable").rows;
+    if(localStorage.stolen == undefined) return;
+    var stolen = JSON.parse(localStorage.stolen);
+    var playerMedians = document.getElementById("playerMediansTable").rows;
+
+    for(let i of stolen){
+        var medianProjections = {};
+        for(let m of playerMedians){
+            if(i.name.trim() == m.cells[1].innerHTML.trim()){
+                
+                var ths = document.getElementById("playerMediansTable").getElementsByTagName("th");
+                for(let t of ths){
+                    if(["Game", "Name", "Position", "Team"].includes(t.innerHTML)) continue;
+                    var slider = document.getElementById(m.cells[1].innerHTML.trim()+t.innerHTML+"Slider");
+                    medianProjections[t.innerHTML] = slider.value;
+                }
+            }
+        }
+        var found = [];
+        var x = 0;
+        while(x < players.length){
+            if(players[x].cells[1].innerHTML.trim() == i.name.trim()){
+                found.push(x);
+                x++;
+            }else{
+                x++;
+            }
+        }
+        if(found.length==0) continue;
+        var playerProjections = JSON.parse(players[found[0]].cells[9].getAttribute("projections"));
+        for(let r in players){
+            var p = players[r];
+            // continue if p is not a row
+            if(p.rowIndex == 0) continue;
+            // continue if p is not a tr element
+            if(p.tagName != "TR") continue;
+
+
+            if(p.cells[1].innerHTML.trim() == i.b1.trim()){
+                var b1Projections = JSON.parse(p.cells[9].getAttribute("projections"));
+                var newProj = addstealBenefit(b1Projections, i.b1Pct);
+                playerProjections = updateFromSteal(playerProjections, b1Projections, newProj);
+                p.cells[9].setAttribute("projections", JSON.stringify(newProj));
+                p.cells[9].innerHTML = ((newProj["Passing Yards"] * 0.04) + (newProj["Passing TDs"] * 4) + (newProj["Interceptions"] * -1) + (newProj["Rushing Yards"] * 0.1) + (newProj["Rushing TDs"] * 6) + (newProj["Receptions"] * 1) + (newProj["Receiving Yards"] * 0.1) + (newProj["Receiving TDs"] * 6)).toFixed(1);
+            }
+            if(p.cells[1].innerHTML.trim() == i.b2.trim()){
+                var b2Projections = JSON.parse(p.cells[9].getAttribute("projections"));
+                var newProj = addstealBenefit(b2Projections, i.b2Pct);
+                playerProjections = updateFromSteal(playerProjections, b2Projections, newProj);
+                p.cells[9].setAttribute("projections", JSON.stringify(newProj));
+                p.cells[9].innerHTML = ((newProj["Passing Yards"] * 0.04) + (newProj["Passing TDs"] * 4) + (newProj["Interceptions"] * -1) + (newProj["Rushing Yards"] * 0.1) + (newProj["Rushing TDs"] * 6) + (newProj["Receptions"] * 1) + (newProj["Receiving Yards"] * 0.1) + (newProj["Receiving TDs"] * 6)).toFixed(1);
+            }
+            if(p.cells[1].innerHTML.trim() == i.b3.trim()){
+                var b3Projections = JSON.parse(p.cells[9].getAttribute("projections"));
+                var newProj = addstealBenefit(b3Projections, i.b3Pct);
+                playerProjections = updateFromSteal(playerProjections, b3Projections, newProj);
+                p.cells[9].setAttribute("projections", JSON.stringify(newProj));
+                p.cells[9].innerHTML = ((newProj["Passing Yards"] * 0.04) + (newProj["Passing TDs"] * 4) + (newProj["Interceptions"] * -1) + (newProj["Rushing Yards"] * 0.1) + (newProj["Rushing TDs"] * 6) + (newProj["Receptions"] * 1) + (newProj["Receiving Yards"] * 0.1) + (newProj["Receiving TDs"] * 6)).toFixed(1);
+            }
+            if(p.cells[1].innerHTML.trim() == i.b4.trim()){
+                var b4Projections = JSON.parse(p.cells[9].getAttribute("projections"));
+                var newProj = addstealBenefit(b4Projections, i.b4Pct);
+                playerProjections = updateFromSteal(playerProjections, b4Projections, newProj);
+                p.cells[9].setAttribute("projections", JSON.stringify(newProj));
+                p.cells[9].innerHTML = ((newProj["Passing Yards"] * 0.04) + (newProj["Passing TDs"] * 4) + (newProj["Interceptions"] * -1) + (newProj["Rushing Yards"] * 0.1) + (newProj["Rushing TDs"] * 6) + (newProj["Receptions"] * 1) + (newProj["Receiving Yards"] * 0.1) + (newProj["Receiving TDs"] * 6)).toFixed(1);
+            }
+            if(p.cells[1].innerHTML.trim() == i.b5.trim()){
+                var b5Projections = JSON.parse(p.cells[9].getAttribute("projections"));
+                var newProj = addstealBenefit(b5Projections, i.b5Pct);
+                playerProjections = updateFromSteal(playerProjections, b5Projections, newProj);
+                p.cells[9].setAttribute("projections", JSON.stringify(newProj));
+                p.cells[9].innerHTML = ((newProj["Passing Yards"] * 0.04) + (newProj["Passing TDs"] * 4) + (newProj["Interceptions"] * -1) + (newProj["Rushing Yards"] * 0.1) + (newProj["Rushing TDs"] * 6) + (newProj["Receptions"] * 1) + (newProj["Receiving Yards"] * 0.1) + (newProj["Receiving TDs"] * 6)).toFixed(1);
+            }
+        }
+        for(let x of found){
+            players[x].cells[9].setAttribute("projections", JSON.stringify(playerProjections));
+            players[x].cells[9].innerHTML = (playerProjections["Passing Yards"]*0.04 + playerProjections["Passing TDs"]*4 + playerProjections["Interceptions"]*-1 + playerProjections["Rushing Yards"]*0.1 + playerProjections["Rushing TDs"]*6 + playerProjections["Receptions"]*1 + playerProjections["Receiving Yards"]*0.1 + playerProjections["Receiving TDs"]*6).toFixed(1);
+        }
+    }
+}
+
+// Add steal benefit to player projections
+function addstealBenefit(bProjections, bPct){
+    var newProj = {};
+    newProj["Passing Yards"] = (Number(bProjections["Passing Yards"]) - Number(bProjections["Passing Yards"]) * Number(bPct)/100).toFixed(1);
+    newProj["Passing TDs"] = (Number(bProjections["Passing TDs"]) - Number(bProjections["Passing TDs"]) * Number(bPct)/100).toFixed(1);
+    newProj["Interceptions"] = (Number(bProjections["Interceptions"]) - Number(bProjections["Interceptions"]) * Number(bPct)/100).toFixed(1);
+    newProj["Rushing Yards"] = (Number(bProjections["Rushing Yards"]) - Number(bProjections["Rushing Yards"]) * Number(bPct)/100).toFixed(1);
+    newProj["Rushing TDs"] = (Number(bProjections["Rushing TDs"]) - Number(bProjections["Rushing TDs"]) * Number(bPct)/100).toFixed(1);
+    newProj["Receptions"] = (Number(bProjections["Receptions"]) - Number(bProjections["Receptions"]) * Number(bPct)/100).toFixed(1);
+    newProj["Receiving Yards"] = (Number(bProjections["Receiving Yards"]) - Number(bProjections["Receiving Yards"]) * Number(bPct)/100).toFixed(1);
+    newProj["Receiving TDs"] = (Number(bProjections["Receiving TDs"]) - Number(bProjections["Receiving TDs"]) * Number(bPct)/100).toFixed(1);
+    return newProj;
+}
+
+
+// Take the difference between bprojections and newproj to add to playerprojections
+function updateFromSteal(playerProjections, oldProj, newProj){
+    if(playerProjections == null) playerProjections = {};
+    for(let p in oldProj){
+        if(playerProjections[p] == null || playerProjections[p] == undefined) playerProjections[p] = 0;
+        playerProjections[p] = (Number(playerProjections[p]) + Number(oldProj[p]) - Number(newProj[p])).toFixed(1);
+    }
+    return playerProjections;
+}
+
+// Clear injuries table
+function clearSteal(){
+    localStorage.stolen = JSON.stringify([]);
+    location.reload();
 }
