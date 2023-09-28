@@ -13,7 +13,7 @@
 <body>
     <div id="wrapper">
         <div id="header">
-            <h1>NFL Data</h1>
+            <h1><img src="dragon.gif" class="dragon"> NFL Dragon <img src="dragon.gif" class="dragon" style="transform:scaleX(-1)"></h1>
         </div>
         <div id="tabs">          
             <button id="contestInfo" class="tabButton">Contest Info</button>
@@ -215,7 +215,7 @@
             <div class="sectionHeader">
                 Pick a slate to optimize: <select id="select2" onchange="updateOtherSelect()"><option value="All slates">All slates</option></select>
                 <!--Slate type: <button class="builderButton" onclick="pickBuilder('Classic')" style="background-color: blue;">Classic</button><button class="builderButton" onclick="pickBuilder('Showdown')">Showdown</button>-->
-                <label style="float:none" for="slider">Variance: <text id="varianceValue">6</text></label><input type="range" id="varianceSlider" value="6" min="0" max="20" step="2" onchange="updateSlider()">
+                <label style="float:none" for="slider">Variance: <text id="varianceValue">6</text></label><input type="range" id="varianceSlider" value="6" min="0" max="20" step="1" onchange="updateSlider()">
             </div>
             <div id="builderControl" class="sectionHeader">
                 Lineups to build: <input type="number" id="lineupsToBuild" value="20" min="1">
@@ -392,7 +392,7 @@
                 <h4>Put the injured player in the first column, then allocate their usage (percentage-wise) to their teammates.<br>Teammate allocation should be "Player Name" | "Percent allocation" (0-100)</h4>
             </div>
             <button onclick="addInjured()">Add row</button>
-            <button onclick="reloadPage()">Save</button>
+            <button onclick="reloadPage()">Apply Changes and Reload</button>
             <button onclick="clearInjuries()">Clear</button>
             <table id="injuryTable" class="tablesorter">
                 <thead>
@@ -415,7 +415,7 @@
                 <h4>Put the benefitting player in the first column, steal their usage (percentage-wise) from their teammates.<br>Teammate allocation should be "Player Name" | "Percent allocation" (0-100)</h4>
             </div>
             <button onclick="addSteal()">Add row</button>
-            <button onclick="reloadPage()">Save</button>
+            <button onclick="reloadPage()">Apply Changes and Reload</button>
             <button onclick="clearSteal()">Clear</button>
             <table id="stealTable" class="tablesorter">
                 <thead>

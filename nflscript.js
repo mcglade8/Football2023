@@ -138,8 +138,29 @@ $(function() {
     adjustProjectionsByInjuries();
     adjustProjectionsByStolen();
     captainize();
+    createDatalist();
 
 });
+
+// Create datalist of players for search bar
+function createDatalist(){
+    var datalist = document.createElement("datalist");
+    datalist.id = "players";
+
+    var table = document.getElementById("contestDataTable");
+    var rows = table.rows;
+    var names = [];
+    for(let r of rows){
+        if(!names.includes(r.cells[1].innerHTML.trim())) names.push(r.cells[1].innerHTML.trim());
+    }
+
+    for(let n of names){
+        var option = document.createElement("option");
+        option.value = n;
+        datalist.appendChild(option);
+    }
+    document.body.appendChild(datalist);
+}
 
 // Save contestDataTable data for access at a later date
 function saveTableData(){
@@ -773,7 +794,7 @@ function randomizeProjection(proj, position){
     // varianceStrength is how much variance affects the projections
     var varianceStrength = 1.5;
 
-    // random number between 0 and 1
+    // random number between 0 and 1, normal dist around 0.5
     var rand = randomNormal();
 
     switch(position){
@@ -803,7 +824,7 @@ function randomizeProjection(proj, position){
     }
 
     var thisProj = Number(proj);
-    variance = (variance*varianceStrength+thisProj*.5)*(rand-curveLean); // variance is higher for higher projections; manipulated by randomness and curveLean
+    variance = (variance*varianceStrength+thisProj*3)*(rand-curveLean); // variance is higher for higher projections; manipulated by randomness and curveLean
     if(thisProj <= 0) return 0.5;
     
     return (thisProj+variance).toFixed(1);
@@ -1509,7 +1530,117 @@ function getPlayerMedians(){
         teamSelect.add(option);
     }
 
+    var kickers = getInfoFromJSON('kickers.json');
+    var defenses = getInfoFromJSON('defenses.json');
+    var fullDSTs = Object.keys(defenses);
+    console.log(fullDSTs);
+    var dsts ={};
+    for(let d = 0; d <fullDSTs.length; d++){
+        console.log(fullDSTs[d].split(" "));
+        var obj = fullDSTs[d].split(" ")[-1];
+        dsts[obj] = fullDSTs[d];
+    }
+    // update PPG column in contestDataTable based on values in playerMedians
+    console.log(dsts);
+    for(let p of players){
+        if(p.cells[1].innerHTML != "Name"){
+            var name = p.cells[1].innerHTML;
+            var team = p.cells[3].innerHTML;
+            var teamMedians = getInfoFromJSON('teamMedians.json')[teamAbbrevToName(team)];
+            if(name in playerMedians){
+                p.cells[7].innerHTML = (playerMedians[name]["Passing Yards"]*0.04/100*Number(teamMedians["Passing Yards"]) + playerMedians[name]["Passing TDs"]*4/100*Number(teamMedians["Passing TDs"]) - playerMedians[name]["Interceptions"]*1/100*Number(teamMedians["Interceptions"]) + playerMedians[name]["Rushing Yards"]*0.1/100*Number(teamMedians["Rushing Yards"]) + playerMedians[name]["Rushing TDs"]*6/100*Number(teamMedians["Rushing TDs"]) + playerMedians[name]["Receptions"]*1/100*Number(teamMedians["Receptions"]) + playerMedians[name]["Receiving Yards"]*0.1/100*Number(teamMedians["Receiving Yards"]) + playerMedians[name]["Receiving TDs"]*6/100*Number(teamMedians["Receiving TDs"])).toFixed(1);
+            }else if(name in kickers){
+                p.cells[7].innerHTML = kickers[name]["FPS"];
+            }else if(name in dsts) {
+                console.log(name);
+                var thisDST = defenses[dsts[name]];
+                var fpts = 0;
+                fpts += thisDST["Sacks"]*1.5;
+                fpts += thisDST["Interceptions"]*.7;
+                fpts += thisDST["Fumbles Recovered"]*1;
+                fpts += thisDST["Safeties"]*.2;
+                fpts += thisDST["Defensive TDs"]*.2;
+                fpts -= thisDST["Points Allowed"]*1.5;
+                fpts -= thisDST["Yards Allowed"]*.7;
+
+                p.cells[7].innerHTML = (6.5+fpts).toFixed(1);
+            }else{
+                p.cells[7].innerHTML = 0;
+            }
+        }
+    }
 }
+
+// Convert team abbrev to name
+function teamAbbrevToName(team){
+    switch(team){
+        case "ARI":
+            return "Arizona Cardinals";
+        case "ATL":
+            return "Atlanta Falcons";
+        case "BAL":
+            return "Baltimore Ravens";
+        case "BUF":
+            return "Buffalo Bills";
+        case "CAR":
+            return "Carolina Panthers";
+        case "CHI":
+            return "Chicago Bears";
+        case "CIN":
+            return "Cincinnati Bengals";
+        case "CLE":
+            return "Cleveland Browns";
+        case "DAL":
+            return "Dallas Cowboys";
+        case "DEN":
+            return "Denver Broncos";
+        case "DET":
+            return "Detroit Lions";
+        case "GB":
+            return "Green Bay Packers";
+        case "HOU":
+            return "Houston Texans";
+        case "IND":
+            return "Indianapolis Colts";
+        case "JAX":
+            return "Jacksonville Jaguars";
+        case "KC":
+            return "Kansas City Chiefs";
+        case "LAC":
+            return "Los Angeles Chargers";
+        case "LAR":
+            return "Los Angeles Rams";
+        case "MIA":
+            return "Miami Dolphins";
+        case "MIN":
+            return "Minnesota Vikings";
+        case "NE":
+            return "New England Patriots";
+        case "NO":
+            return "New Orleans Saints";
+        case "NYG":
+            return "New York Giants";
+        case "NYJ":
+            return "New York Jets";
+        case "LV":
+            return "Las Vegas Raiders";
+        case "PHI":
+            return "Philadelphia Eagles";
+        case "PIT":
+            return "Pittsburgh Steelers";
+        case "SEA":
+            return "Seattle Seahawks";
+        case "SF":
+            return "San Francisco 49ers";
+        case "TB":
+            return "Tampa Bay Buccaneers";
+        case "TEN":
+            return "Tennessee Titans";
+        case "WAS":
+            return "Washington Commanders";
+    }
+}
+
 
 // Update player medians in storage
 function updatePlayerMedians(){
@@ -2229,19 +2360,21 @@ function addInjured(){
     var table = document.getElementById("injuryTable");
     var row = table.insertRow(-1);
     var cell = row.insertCell(-1);
-    cell.innerHTML = '<input type="text" class="injuryName injury" onchange="updateInjuryTable()">';
+    cell.innerHTML = '<input list="players" class="injuryName injury" onchange="updateInjuryTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<input type="text" class="injuryB1 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB1Pct injury" onchange="updateInjuryTable()">';
+    cell.innerHTML = '<input list="players" class="injuryB1 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB1Pct injury" onchange="updateInjuryTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<input type="text" class="injuryB2 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB2Pct injury" onchange="updateInjuryTable()">';
+    cell.innerHTML = '<input list="players" class="injuryB2 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB2Pct injury" onchange="updateInjuryTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<input type="text" class="injuryB3 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB3Pct injury" onchange="updateInjuryTable()">';
+    cell.innerHTML = '<input list="players" class="injuryB3 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB3Pct injury" onchange="updateInjuryTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<input type="text" class="injuryB4 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB4Pct injury" onchange="updateInjuryTable()">';
+    cell.innerHTML = '<input list="players" class="injuryB4 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB4Pct injury" onchange="updateInjuryTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<input type="text" class="injuryB5 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB5Pct injury" onchange="updateInjuryTable()">';
+    cell.innerHTML = '<input list="players" class="injuryB5 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB5Pct injury" onchange="updateInjuryTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<button onclick="removeRow(this)">Remove</button>'
+    cell.innerHTML = '<button onclick="removeRow(this)">Remove</button>';
+
+
 }
 
 // Update injury table based on input
@@ -2276,17 +2409,17 @@ function getInjuryTable(){
     for(let i of injuries){
         var row = table.insertRow(-1);
         var cell = row.insertCell(-1);
-        cell.innerHTML = '<input type="text" class="injuryName injury" onchange="updateInjuryTable()" value="'+i.name+'">';
+        cell.innerHTML = '<input list="players" class="injuryName injury" onchange="updateInjuryTable()" value="'+i.name+'">';
         cell = row.insertCell(-1);
-        cell.innerHTML = '<input type="text" class="injuryB1 injury" onchange="updateInjuryTable()" value="'+i.b1+'"><input type="number" class="injuryB1Pct injury" onchange="updateInjuryTable()" value="'+i.b1Pct+'">';
+        cell.innerHTML = '<input list="players" class="injuryB1 injury" onchange="updateInjuryTable()" value="'+i.b1+'"><input type="number" class="injuryB1Pct injury" onchange="updateInjuryTable()" value="'+i.b1Pct+'">';
         cell = row.insertCell(-1);
-        cell.innerHTML = '<input type="text" class="injuryB2 injury" onchange="updateInjuryTable()" value="'+i.b2+'"><input type="number" class="injuryB2Pct injury" onchange="updateInjuryTable()" value="'+i.b2Pct+'">';
+        cell.innerHTML = '<input list="players" class="injuryB2 injury" onchange="updateInjuryTable()" value="'+i.b2+'"><input type="number" class="injuryB2Pct injury" onchange="updateInjuryTable()" value="'+i.b2Pct+'">';
         cell = row.insertCell(-1);
-        cell.innerHTML = '<input type="text" class="injuryB3 injury" onchange="updateInjuryTable()" value="'+i.b3+'"><input type="number" class="injuryB3Pct injury" onchange="updateInjuryTable()" value="'+i.b3Pct+'">';
+        cell.innerHTML = '<input list="players" class="injuryB3 injury" onchange="updateInjuryTable()" value="'+i.b3+'"><input type="number" class="injuryB3Pct injury" onchange="updateInjuryTable()" value="'+i.b3Pct+'">';
         cell = row.insertCell(-1);
-        cell.innerHTML = '<input type="text" class="injuryB4 injury" onchange="updateInjuryTable()" value="'+i.b4+'"><input type="number" class="injuryB4Pct injury" onchange="updateInjuryTable()" value="'+i.b4Pct+'">';
+        cell.innerHTML = '<input list="players" class="injuryB4 injury" onchange="updateInjuryTable()" value="'+i.b4+'"><input type="number" class="injuryB4Pct injury" onchange="updateInjuryTable()" value="'+i.b4Pct+'">';
         cell = row.insertCell(-1);
-        cell.innerHTML = '<input type="text" class="injuryB5 injury" onchange="updateInjuryTable()" value="'+i.b5+'"><input type="number" class="injuryB5Pct injury" onchange="updateInjuryTable()" value="'+i.b5Pct+'">';
+        cell.innerHTML = '<input list="players" class="injuryB5 injury" onchange="updateInjuryTable()" value="'+i.b5+'"><input type="number" class="injuryB5Pct injury" onchange="updateInjuryTable()" value="'+i.b5Pct+'">';
         cell = row.insertCell(-1);
         cell.innerHTML = '<button onclick="removeRow(this)">Remove</button>';
     }
@@ -2437,19 +2570,26 @@ function addSteal(){
     var table = document.getElementById("stealTable");
     var row = table.insertRow(-1);
     var cell = row.insertCell(-1);
-    cell.innerHTML = '<input type="text" class="stealName steal" onchange="updatestealTable()">';
+    cell.innerHTML = '<input list="players" class="stealName steal" onchange="updatestealTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<input type="text" class="stealB1 steal" onchange="updatestealTable()"><input type="number" class="stealB1Pct steal" onchange="updatestealTable()">';
+    cell.innerHTML = '<input list="players" class="stealB1 steal" onchange="updatestealTable()"><input type="number" class="stealB1Pct steal" onchange="updatestealTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<input type="text" class="stealB2 steal" onchange="updatestealTable()"><input type="number" class="stealB2Pct steal" onchange="updatestealTable()">';
+    cell.innerHTML = '<input list="players" class="stealB2 steal" onchange="updatestealTable()"><input type="number" class="stealB2Pct steal" onchange="updatestealTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<input type="text" class="stealB3 steal" onchange="updatestealTable()"><input type="number" class="stealB3Pct steal" onchange="updatestealTable()">';
+    cell.innerHTML = '<input list="players" class="stealB3 steal" onchange="updatestealTable()"><input type="number" class="stealB3Pct steal" onchange="updatestealTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<input type="text" class="stealB4 steal" onchange="updatestealTable()"><input type="number" class="stealB4Pct steal" onchange="updatestealTable()">';
+    cell.innerHTML = '<input list="players" class="stealB4 steal" onchange="updatestealTable()"><input type="number" class="stealB4Pct steal" onchange="updatestealTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<input type="text" class="stealB5 steal" onchange="updatestealTable()"><input type="number" class="stealB5Pct steal" onchange="updatestealTable()">';
+    cell.innerHTML = '<input list="players" class="stealB5 steal" onchange="updatestealTable()"><input type="number" class="stealB5Pct steal" onchange="updatestealTable()">';
     cell = row.insertCell(-1);
     cell.innerHTML = '<button onclick="removeRow(this)">Remove</button>';
+
+    var players = document.getElementById("contestDataTable").rows;
+    var names = [];
+    for(let p of players){
+        if(p.rowIndex == 0) continue;
+        names.push(p.cells[1].innerHTML.trim());
+    }
     
 }
 
@@ -2457,6 +2597,8 @@ function addSteal(){
 function removeRow(button){
     var row = button.parentNode.parentNode;
     row.parentNode.removeChild(row);
+    updateInjuryTable();
+    updatestealTable();
 }
 
 // Update steal table based on input
@@ -2491,17 +2633,17 @@ function getStealTable(){
     for(let i of stolen){
         var row = table.insertRow(-1);
         var cell = row.insertCell(-1);
-        cell.innerHTML = '<input type="text" class="stealName steal" onchange="updatestealTable()" value="'+i.name+'">';
+        cell.innerHTML = '<input list="players" class="stealName steal" onchange="updatestealTable()" value="'+i.name+'">';
         cell = row.insertCell(-1);
-        cell.innerHTML = '<input type="text" class="stealB1 steal" onchange="updatestealTable()" value="'+i.b1+'"><input type="number" class="stealB1Pct steal" onchange="updatestealTable()" value="'+i.b1Pct+'">';
+        cell.innerHTML = '<input list="players" class="stealB1 steal" onchange="updatestealTable()" value="'+i.b1+'"><input type="number" class="stealB1Pct steal" onchange="updatestealTable()" value="'+i.b1Pct+'">';
         cell = row.insertCell(-1);
-        cell.innerHTML = '<input type="text" class="stealB2 steal" onchange="updatestealTable()" value="'+i.b2+'"><input type="number" class="stealB2Pct steal" onchange="updatestealTable()" value="'+i.b2Pct+'">';
+        cell.innerHTML = '<input list="players" class="stealB2 steal" onchange="updatestealTable()" value="'+i.b2+'"><input type="number" class="stealB2Pct steal" onchange="updatestealTable()" value="'+i.b2Pct+'">';
         cell = row.insertCell(-1);
-        cell.innerHTML = '<input type="text" class="stealB3 steal" onchange="updatestealTable()" value="'+i.b3+'"><input type="number" class="stealB3Pct steal" onchange="updatestealTable()" value="'+i.b3Pct+'">';
+        cell.innerHTML = '<input list="players" class="stealB3 steal" onchange="updatestealTable()" value="'+i.b3+'"><input type="number" class="stealB3Pct steal" onchange="updatestealTable()" value="'+i.b3Pct+'">';
         cell = row.insertCell(-1);
-        cell.innerHTML = '<input type="text" class="stealB4 steal" onchange="updatestealTable()" value="'+i.b4+'"><input type="number" class="stealB4Pct steal" onchange="updatestealTable()" value="'+i.b4Pct+'">';
+        cell.innerHTML = '<input list="players" class="stealB4 steal" onchange="updatestealTable()" value="'+i.b4+'"><input type="number" class="stealB4Pct steal" onchange="updatestealTable()" value="'+i.b4Pct+'">';
         cell = row.insertCell(-1);
-        cell.innerHTML = '<input type="text" class="stealB5 steal" onchange="updatestealTable()" value="'+i.b5+'"><input type="number" class="stealB5Pct steal" onchange="updatestealTable()" value="'+i.b5Pct+'">';
+        cell.innerHTML = '<input list="players" class="stealB5 steal" onchange="updatestealTable()" value="'+i.b5+'"><input type="number" class="stealB5Pct steal" onchange="updatestealTable()" value="'+i.b5Pct+'">';
         cell = row.insertCell(-1);
         cell.innerHTML = '<button onclick="removeRow(this)">Remove</button>';
     }
