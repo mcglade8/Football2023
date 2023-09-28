@@ -1158,7 +1158,7 @@ function correlateByTeam(players){
                 p.proj = (p.proj * (1 - teamProjections[p.opponent].correlate * 0.8 + teamProjections[p.team].correlate * .2)).toFixed(1);
                 break;
             case "K":
-                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * .2-teamProjections[p.opponent].correlate * .2)).toFixed(1);
+                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * 1-teamProjections[p.opponent].correlate * .5)).toFixed(1);
                 break;
             default: 
                 p.proj = (p.proj * (1 + teamProjections[p.team].correlate * .5)).toFixed(1);
@@ -1175,7 +1175,7 @@ function optimizeShowdown(players){
     var modelVariables = {};
     var teams = [];
     for(let p of players){
-        if(p.proj <= 0) continue;
+        //if(p.proj <= 0) continue;
         let n = p.name;
         let t = p.team;
         if(!teams.includes(t)) teams.push(t);
@@ -1192,7 +1192,14 @@ function optimizeShowdown(players){
         }
 
     }
-    
+
+    // convert CPT proj to 1.5x flex proj
+    for(let k of Object.keys(modelVariables)){
+        if(k.includes("CPT")){
+            let n = k.replace("CPT ", "").trim();
+            modelVariables[k]["proj"] = Number(modelVariables[n]["proj"]) * 1.5;
+        }
+    }
     var results;
     require(['solver'], function(solver) {
         
@@ -2280,6 +2287,8 @@ function getInjuryTable(){
         cell.innerHTML = '<input type="text" class="injuryB4 injury" onchange="updateInjuryTable()" value="'+i.b4+'"><input type="number" class="injuryB4Pct injury" onchange="updateInjuryTable()" value="'+i.b4Pct+'">';
         cell = row.insertCell(-1);
         cell.innerHTML = '<input type="text" class="injuryB5 injury" onchange="updateInjuryTable()" value="'+i.b5+'"><input type="number" class="injuryB5Pct injury" onchange="updateInjuryTable()" value="'+i.b5Pct+'">';
+        cell = row.insertCell(-1);
+        cell.innerHTML = '<button onclick="removeRow(this)">Remove</button>';
     }
 }
 
@@ -2322,7 +2331,7 @@ function adjustProjectionsByInjuries(){
             // continue if p is not a tr element
             if(p.tagName != "TR") continue;
 
-
+            //console.log(p);
             if(p.cells[1].innerHTML.trim() == i.b1.trim()){
                 var b1Projections = JSON.parse(p.cells[9].getAttribute("projections"));
                 var newProj = addInjuryBenefit(playerProjections, b1Projections, i.b1Pct);
@@ -2440,7 +2449,7 @@ function addSteal(){
     cell = row.insertCell(-1);
     cell.innerHTML = '<input type="text" class="stealB5 steal" onchange="updatestealTable()"><input type="number" class="stealB5Pct steal" onchange="updatestealTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<button onclick="removeRow(this)">Remove</button>'
+    cell.innerHTML = '<button onclick="removeRow(this)">Remove</button>';
     
 }
 
@@ -2493,6 +2502,8 @@ function getStealTable(){
         cell.innerHTML = '<input type="text" class="stealB4 steal" onchange="updatestealTable()" value="'+i.b4+'"><input type="number" class="stealB4Pct steal" onchange="updatestealTable()" value="'+i.b4Pct+'">';
         cell = row.insertCell(-1);
         cell.innerHTML = '<input type="text" class="stealB5 steal" onchange="updatestealTable()" value="'+i.b5+'"><input type="number" class="stealB5Pct steal" onchange="updatestealTable()" value="'+i.b5Pct+'">';
+        cell = row.insertCell(-1);
+        cell.innerHTML = '<button onclick="removeRow(this)">Remove</button>';
     }
 }
 

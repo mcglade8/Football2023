@@ -215,7 +215,7 @@
             <div class="sectionHeader">
                 Pick a slate to optimize: <select id="select2" onchange="updateOtherSelect()"><option value="All slates">All slates</option></select>
                 <!--Slate type: <button class="builderButton" onclick="pickBuilder('Classic')" style="background-color: blue;">Classic</button><button class="builderButton" onclick="pickBuilder('Showdown')">Showdown</button>-->
-                <label style="float:none" for="slider">Variance: <text id="varianceValue">6</text></label><input type="range" id="varianceSlider" value="6" min="0" max="10" step="1" onchange="updateSlider()">
+                <label style="float:none" for="slider">Variance: <text id="varianceValue">6</text></label><input type="range" id="varianceSlider" value="6" min="0" max="20" step="2" onchange="updateSlider()">
             </div>
             <div id="builderControl" class="sectionHeader">
                 Lineups to build: <input type="number" id="lineupsToBuild" value="20" min="1">
