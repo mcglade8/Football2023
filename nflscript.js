@@ -800,23 +800,23 @@ function randomizeProjection(proj, position){
     switch(position){
         case "QB":
             curveLean = 0.7;
-            varianceStrength = 1.8;
+            varianceStrength = 0.5;
             break;
         case "RB":
             curveLean = .65;
-            varianceStrength = 1.8;
+            varianceStrength = 1.2;
             break;
         case "WR":
             curveLean = .5;
-            varianceStrength = 1.8;
+            varianceStrength = 1.7;
             break;
         case "TE":
             curveLean = .65;
-            varianceStrength = 1.5;
+            varianceStrength = 0.5;
             break;
         case "DST":
             curveLean = .7;
-            varianceStrength = 1.2;
+            varianceStrength = 1;
             break;
         case "K":
             curveLean = .5;
@@ -824,7 +824,7 @@ function randomizeProjection(proj, position){
     }
 
     var thisProj = Number(proj);
-    variance = (variance*varianceStrength+thisProj*3)*(rand-curveLean); // variance is higher for higher projections; manipulated by randomness and curveLean
+    variance = (variance*varianceStrength+thisProj*varianceStrength)*(rand-curveLean); // variance is higher for higher projections; manipulated by randomness and curveLean
     if(thisProj <= 0) return 0.5;
     
     return (thisProj+variance).toFixed(1);
