@@ -145,7 +145,7 @@ $(function() {
 // Create datalist of players for search bar
 function createDatalist(){
     var datalist = document.createElement("datalist");
-    datalist.id = "players";
+    datalist.id = "playersList";
 
     var table = document.getElementById("contestDataTable");
     var rows = table.rows;
@@ -218,7 +218,7 @@ function loadTableData(){
                     row.cells[2].setAttribute("kicker", "kicker");
                     row.cells[2].setAttribute("pos", "K");
                 } else {
-                    if(row.length == 11) row.cells[2].setAttribute("pos", tableData[i][j]); else row.cells[2].setAttribute("pos", tableData[i][j+1]);
+                    row.cells[2].setAttribute("pos", tableData[i][j]);//if(row.length == 11) row.cells[2].setAttribute("pos", tableData[i][j]); else row.cells[2].setAttribute("pos", tableData[i][j]);
                 }
                 
             }else {
@@ -784,50 +784,82 @@ function buildLineups(){
 }
 
 // Randomize projection
-function randomizeProjection(proj, position){
+function randomizeProjection(projection, position, rushtds, rectds, ptds){
     var variance = Number(document.getElementById("varianceValue").innerHTML.trim());
-    if(proj <= 0) return 0;
-    // curveLean is how much the curve leans away from the mean; 
-    // under .5 means it leans right, over .5 means it leans left
-    var curveLean = 0.5;
-
-    // varianceStrength is how much variance affects the projections
-    var varianceStrength = 1.5;
-
-    // random number between 0 and 1, normal dist around 0.5
-    var rand = randomNormal();
+    var thisProj = Number(projection);
+    if(thisProj <= 0) return 0.5;
+    var sd = 0;
+    let tdTries = 0;
+    let tdChance =0;
+    let drives = 0; // impacting projections too aggressively; setting to 0 will allow SD to solely control variance
+    rushtds = Number(rushtds);
+    rectds = Number(rectds);
+    ptds = Number(ptds);
 
     switch(position){
         case "QB":
-            curveLean = 0.7;
-            varianceStrength = 0.5;
+            sd = thisProj/30 + 6;
+            tdTries = Math.ceil(ptds*drives);
+            tdChance = ptds/tdTries;
+            for(let i = 0; i < tdTries; i++){
+                if(Math.random() < tdChance) thisProj += 4; else thisProj -= 4;
+            }
             break;
         case "RB":
-            curveLean = .65;
-            varianceStrength = 1.2;
+            sd = thisProj/2;
+            tdTries = Math.ceil(rushtds*drives);
+            tdChance = rushtds/tdTries;
+            for(let i = 0; i < tdTries; i++){
+                if(Math.random() < tdChance) thisProj += 6; else thisProj -= 6;
+            }
+            tdTries = Math.ceil(rectds*drives);
+            tdChance = rectds/tdTries;
+            for(let i = 0; i < tdTries; i++){
+                if(Math.random() < tdChance) thisProj += 6; else thisProj -= 6;
+            }
             break;
         case "WR":
-            curveLean = .5;
-            varianceStrength = 1.7;
+            sd = thisProj * 0.6;
+            thisProj = Math.max(Math.min(thisProj, 10), 6.5);
+            tdTries = Math.ceil(rushtds*drives);
+            tdChance = rushtds/tdTries;
+            for(let i = 0; i < tdTries; i++){
+                if(Math.random() < tdChance) thisProj += 6; else thisProj -= 6;
+            }
+            tdTries = Math.ceil(rectds*drives);
+            tdChance = rectds/tdTries;
+            for(let i = 0; i < tdTries; i++){
+                if(Math.random() < tdChance) thisProj += 6; else thisProj -= 6;
+            }
             break;
         case "TE":
-            curveLean = .65;
-            varianceStrength = 0.5;
+            sd = thisProj * 0.8;
+            thisProj = Math.min(thisProj, 10);
+            tdTries = Math.ceil(rushtds*drives);
+            tdChance = rushtds/tdTries;
+            for(let i = 0; i < tdTries; i++){
+                if(Math.random() < tdChance) thisProj += 6; else thisProj -= 6;
+            }
+            tdTries = Math.ceil(rectds*drives);
+            tdChance = rectds/tdTries;
+            for(let i = 0; i < tdTries; i++){
+                if(Math.random() < tdChance) thisProj += 6; else thisProj -= 6;
+            }
             break;
         case "DST":
-            curveLean = .7;
-            varianceStrength = 1;
+            sd = 6;
             break;
         case "K":
-            curveLean = .5;
-            varianceStrength = 1;
+            sd = 4;
+            break;
     }
 
-    var thisProj = Number(proj);
-    variance = (variance*varianceStrength+thisProj*varianceStrength)*(rand-curveLean); // variance is higher for higher projections; manipulated by randomness and curveLean
+    sd = Number(sd) * (1 + variance/10);
+
+    thisProj = thisProj + Number(sd)*(3*randomNormal()-1.5); ///gaussianRandom(thisProj, sd);
+
     if(thisProj <= 0) return 0.5;
-    
-    return (thisProj+variance).toFixed(1);
+    return (Number(thisProj)).toFixed(1);
 }
 
 // Return a randomized number between 0 and 1 with a normal distribution and mean of .5
@@ -837,6 +869,15 @@ function randomNormal(){
         rand += Math.random();
     }
     return rand / 6;
+}
+
+// Return a normalized random number with a given mean and sd
+function gaussianRandom(mean=0, stdev=1) {
+    const u = 1 - Math.random(); // Converting [0,1) to (0,1]
+    const v = Math.random();
+    const z = Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
+    // Transform to the desired mean and standard deviation:
+    return z * stdev + mean;
 }
 
 
@@ -944,9 +985,13 @@ function optimizeClassic(players){
         results = solver.Solve(model);
         // make sure it's not already in our lineups
         if(!results.feasible) {
-            if(localStorage.notFeasible == undefined) localStorage.notFeasible = 1; else localStorage.notFeasible = Number(localStorage.notFeasible)++;
+            if(localStorage.notFeasible){ 
+                let notFeasible = Number(localStorage.notFeasible);
+                notFeasible++;
+                localStorage.notFeasible = notFeasible;
+            } else localStorage.notFeasible = 1;
             if(Number(localStorage.notFeasible) > 10) {
-                alert("No more lineups available");
+                console.log("No more lineups available");
                 return;
             } else optimizeClassic(generateProjections());
         } else {
@@ -1088,7 +1133,7 @@ function updateOwnership(){
     for(let p of Object.keys(players)){
         var row = ownershipTable.insertRow(-1);
         row.insertCell(0).innerHTML = p;
-        row.insertCell(1).innerHTML = players[p];
+        row.insertCell(1).innerHTML = (players[p]/lineupTable.rows.length*100).toFixed(1);
     }
     sortTable("ownership", 1);
 }
@@ -1139,18 +1184,53 @@ function generateProjections(){
     var players = [];
 
     for(let r of contestDataTable.rows){
-        if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position")){
-            var player = {name: r.cells[1].innerHTML, id: r.cells[6].innerHTML, position: r.cells[2].innerHTML, team: r.cells[3].innerHTML, opponent: r.cells[4].innerHTML, salary: r.cells[5].innerHTML, proj: randomizeProjection(r.cells[9].innerHTML, r.cells[2].innerHTML)};
-            if(player.position == "FLEX" || player.position == "CPT"){
-                player.rosterPosition = player.position;
-                player.position = r.cells[2].getAttribute("pos");
+        if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position") && Number(r.cells[9].innerHTML) > 0){
+            let rushTDOdds = 0;
+            let recTDOdds = 0;
+            let passTDOdds = 0;
+            let rushYards = 0;
+            let recYards = 0;
+            //let newProj = 0;
+            let pos = r.cells[2].innerHTML;
+            let rosterPosition = pos;
+            if(pos == "FLEX" || pos == "CPT"){ 
+                pos = r.cells[2].getAttribute("pos").toUpperCase();     
             }
+            if(r.cells[9].getAttribute("projections") != null && r.cells[9].getAttribute("projections") != undefined){
+                let projections = JSON.parse(r.cells[9].getAttribute("projections"));
+                rushYards = Number(projections["Rushing Yards"]);
+                recYards = Number(projections["Receiving Yards"]);
+                rushTDOdds = Number(projections["Rushing TDs"]);
+                recTDOdds = Number(projections["Receiving TDs"]);
+                passTDOdds = Number(projections["Passing TDs"]);
+            } 
+            var player = {'name': r.cells[1].innerHTML, 
+                'id': r.cells[6].innerHTML, 
+                'position': pos, 
+                'team': r.cells[3].innerHTML, 
+                'opponent': r.cells[4].innerHTML, 
+                'salary': r.cells[5].innerHTML, 
+                'oldProj': r.cells[9].innerHTML, 
+                'rushTDOdds': rushTDOdds, 
+                'recTDOdds': recTDOdds, 
+                'passTDOdds': passTDOdds, 
+                'rushYards': rushYards, 
+                'recYards': recYards,
+                'rosterPosition': rosterPosition
+            };
+            
+            // Assign a value proj using the randomizeProjection function
+            player.proj = randomizeProjection(Number(r.cells[9].innerHTML), pos, rushTDOdds, recTDOdds, passTDOdds);
+            // If player.proj is NaN fix it
+            
             players.push(player);
+           
         }
     }
-    players = correlateByTeam(players);
 
-    return players;
+    //players = correlateByTeam(players);
+
+    return correlateByTeam(players);
 }
 
 // Manipulate projections to correlate by team
@@ -1158,37 +1238,84 @@ function correlateByTeam(players){
     var teamProjections = {};
     for(let p of players){
         if(teamProjections[p.team] == undefined){
-            teamProjections[p.team] = {correlate: (randomNormal()*3-1.5)};
+            let correlateRush= randomNormal() + randomNormal();
+            let correlatePass= randomNormal() + randomNormal();
+
+            teamProjections[p.team] = {
+                correlateRush: correlateRush,
+                correlatePass: correlatePass,
+                correlateTeam: (correlateRush + correlatePass)/2,
+
+            };
+            if(p.position == "WR" || p.position == "TE"){
+                teamProjections[p.team].recProj = p.proj;
+                teamProjections[p.team].origRecProj = p.oldProj;
+                teamProjections[p.team].rushProj = 0;
+                teamProjections[p.team].origRushProj = 0;
+            }else if(p.position == "RB") {
+                teamProjections[p.team].rushProj = p.proj;
+                teamProjections[p.team].origRushProj = p.oldProj;
+                teamProjections[p.team].recProj = 0;
+                teamProjections[p.team].origRecProj = 0;
+            } else{
+                teamProjections[p.team].rushProj = 0;
+                teamProjections[p.team].origRushProj = 0;
+                teamProjections[p.team].recProj = 0;
+                teamProjections[p.team].origRecProj = 0;
+            }
+        } else{
+            if(p.position == "WR" || p.position == "TE"){
+                let x = Number(teamProjections[p.team].recProj);
+                teamProjections[p.team].recProj = x + Number(p.proj);
+                let y = Number(teamProjections[p.team].origRecProj);
+                teamProjections[p.team].origRecProj = y + Number(p.oldProj);
+            }
+            if(p.position == "RB"){ 
+                let x = Number(teamProjections[p.team].rushProj);
+                teamProjections[p.team].rushProj = x + Number(p.proj);
+                let y = Number(teamProjections[p.team].origRushProj);
+                teamProjections[p.team].origRushProj = y + Number(p.oldProj);
+            }
         }
+
     }
     for(let p of players){
+        p.proj = Number(p.proj);
+        let teamOrigRushProjWithCorrelate = teamProjections[p.team].origRushProj * teamProjections[p.team].correlateRush; // new team total rb fantasy points
+        let teamOrigRecProjWithCorrelate = teamProjections[p.team].origRecProj * teamProjections[p.team].correlatePass; // new team total wr and te fantasy points
+
+        let teamRushProjWithCorrelate = teamProjections[p.team].rushProj; // new team total rb fantasy points
+        let teamRecProjWithCorrelate = teamProjections[p.team].recProj; // new team total wr and te fantasy points
+
+        
         switch(p.position){
             case "QB":
-                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * .75+teamProjections[p.opponent].correlate * .5)).toFixed(1);
+                p.proj = (p.proj * (teamProjections[p.team].correlatePass * .8 + teamProjections[p.opponent].correlateTeam * .2)).toFixed(1);
                 break;
             case "RB":
-                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * .05-teamProjections[p.opponent].correlate * .15)).toFixed(1);
+                p.proj = (p.proj/teamRushProjWithCorrelate * teamOrigRushProjWithCorrelate).toFixed(1);
                 break;
             case "WR":
-                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * .65+teamProjections[p.opponent].correlate * .3)).toFixed(1);
+                p.proj = (p.proj/teamRecProjWithCorrelate * teamOrigRecProjWithCorrelate).toFixed(1);
                 break;
             case "TE":
-                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * .4)).toFixed(1);
+                p.proj = (p.proj/teamRecProjWithCorrelate * teamOrigRecProjWithCorrelate).toFixed(1);
                 break;
             case "DST":
-                p.proj = (p.proj * (1 - teamProjections[p.opponent].correlate * 0.8 + teamProjections[p.team].correlate * .2)).toFixed(1);
+                p.proj = (p.proj / (teamProjections[p.opponent].correlateTeam ) / (teamProjections[p.opponent].correlatePass) * (teamProjections[p.team].correlateRush) ).toFixed(1);
                 break;
             case "K":
-                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * 1-teamProjections[p.opponent].correlate * .5)).toFixed(1);
+                p.proj = (p.proj * (teamProjections[p.team].correlateTeam)).toFixed(1);
                 break;
             default: 
-                p.proj = (p.proj * (1 + teamProjections[p.team].correlate * .5)).toFixed(1);
+                p.proj = (p.proj * (teamProjections[p.team].correlateTeam)).toFixed(1);
                 break;
         }
         if(p.proj <= 0) p.proj = 0;
     }
     return players;
 }
+
 
 // Solve a DraftKings showdown lineup for a given contest start time
 function optimizeShowdown(players){
@@ -1219,6 +1346,7 @@ function optimizeShowdown(players){
         if(k.includes("CPT")){
             let n = k.replace("CPT ", "").trim();
             modelVariables[k]["proj"] = Number(modelVariables[n]["proj"]) * 1.5;
+            modelVariables[k]["salary"] = Number(modelVariables[n]["salary"]) * 1.5;
         }
     }
     var results;
@@ -1248,42 +1376,47 @@ function optimizeShowdown(players){
 
         results = solver.Solve(model);
         // make sure it's not already in our lineups
-
         if(!results.feasible) {
-            if(localStorage.notFeasible == undefined) localStorage.notFeasible = 1; else localStorage.notFeasible = Number(localStorage.notFeasible)++;
+            if(localStorage.notFeasible){ 
+                let notFeasible = Number(localStorage.notFeasible);
+                notFeasible++;
+                localStorage.setItem('notFeasible', notFeasible); 
+            }else localStorage.notFeasible = 1;
             if(Number(localStorage.notFeasible) > 10) {
-                alert("No more lineups available");
+                console.log("No more lineups available");
                 return;
-            } else optimizeClassic(generateProjections());
+            } else optimizeShowdown(generateProjections());
         } else {
             var alreadyBuilt = false;
             var thisLineup = [];
             var cpt = "";
             for(let k of Object.keys(results)){
                 if(k != "feasible" && k != "result" && k != "bounded" && k != "iterations" && k != "time" && k != "dual" && k != "primal" && k != "isIntegral"){
-                    var x=0;
-                    while(x < players.length){
-                        if(players[x].name.trim() === k.trim()){ 
-                            thisLineup.push(players[x].name); 
-                        } else if(players[x].name.trim() === k.replace("CPT ", "").trim()){
-                            cpt = players[x].name;
-                        } 
-                        x++;
+                    if(k.includes("CPT")){
+                        cpt = k;
+                    }else{
+                        thisLineup.push(k);
                     }
-                    
                 }
             }
             thisLineup = sortArray(thisLineup);
             thisLineup.push(cpt);
             //thisLineup = JSON.stringify(thisLineup);
+            var flipLineup = thisLineup;
+
+            flipLineup[5] = flipLineup[5].replace("CPT ", "");
             var builtLineups = getBuiltShowdownLineups();
             for(let l of builtLineups){
-                if(JSON.stringify(l) == JSON.stringify(thisLineup)) alreadyBuilt = true;
+                if(JSON.stringify(l) == JSON.stringify(flipLineup)) alreadyBuilt = true;
             }
-            if(!alreadyBuilt && thisLineup.length == 6) setTimeout(addLineupShowdown(results, players), 100); else(optimizeShowdown(generateProjections()));
+            console.log(flipLineup);
+            if(!alreadyBuilt && thisLineup.length == 6) setTimeout(addLineupShowdown(thisLineup, modelVariables), 100); else(optimizeShowdown(generateProjections()));
         }
     });
 }
+
+
+
 // Sort array alphabetically - using to compare lineups to see if they're already built
 function sortArray(arr){
     var sorted = false;
@@ -1347,58 +1480,30 @@ function getBuiltShowdownLineups(){
 // Add lineup to showdownLineupTable
 function addLineupShowdown(lineup,players){
     //setTimeout(function(){return;}, 1000);
+
     var lineupTable = document.getElementById("showdownLineupTable");
     var row = lineupTable.insertRow(-1);
-    var lineupForTable = [];
-    for(let k of Object.keys(lineup)){
-        if(k != "feasible" && k != "result" && k != "bounded" && k != "iterations" && k != "time" && k != "dual" && k != "primal" && k != "isIntegral"){
-            var found = false, x=0;
-            while(!found && x < players.length){
-                if(players[x].name.trim() == k.replace("CPT ", "").trim()) {
-                    if(k.includes("CPT")){
-                        if(players[x]["rosterPosition"] == 'CPT'){
-                            found = true; 
-                            lineupForTable.push(players[x]);
-                        } else x++;
-                    }else{
-                        if(players[x]["rosterPosition"] != 'CPT'){
-                            found = true; 
-                            lineupForTable.push(players[x]);
-                        } else x++;
-                    }
-                }else x++;
-            }
-
-        }
-        
-    }
     
-    // order lineupForTable by position
-    var cpts = [];
-    var flexs = [];
-    var totalProj =0;
-    var totalSalary = 0;
-    for(let p of lineupForTable){
-        if(p.rosterPosition == "CPT"){
-            cpts.push(p);
-        }else{
-            flexs.push(p);
-        }
-        totalProj += Number(p.proj);
-        totalSalary += Number(p.salary);
-    }
-
     var orderedLineup = [];
-    for(let p of cpts){
-        orderedLineup.push(p);
-    }
-    for(let p of flexs){
-        orderedLineup.push(p);
+    
+    for(let i = 0; i< lineup.length; i++){
+        players[lineup[5-i]]["name"] = lineup[5-i].replace("CPT ", "");
+        orderedLineup.push(players[lineup[5-i]]);
     }
 
+    let totalProj = 0;
+    let totalSalary = 0;
     for(let p of orderedLineup){
         var cell = row.insertCell(-1);
-        cell.innerHTML = p.name + "<br>" + p.team + "<br>" + p.salary + "<br>" + Number(p.proj).toFixed(1);
+        let name = p.name.replace("CPT ", "");
+        let team = "";
+        for(let k of Object.keys(p)){
+            if((k.length == 3 || k.length == 2) && k != "CPT") team = k;
+        }
+
+        cell.innerHTML = name + "<br>" + team + "<br>" + Number(p.salary) + "<br>" + Number(p.proj).toFixed(1);
+        totalSalary += Number(p.salary);
+        totalProj += Number(p.proj);
     }
     row.insertCell(-1).innerHTML = totalSalary;
     row.insertCell(-1).innerHTML = totalProj.toFixed(1);
@@ -1533,15 +1638,12 @@ function getPlayerMedians(){
     var kickers = getInfoFromJSON('kickers.json');
     var defenses = getInfoFromJSON('defenses.json');
     var fullDSTs = Object.keys(defenses);
-    console.log(fullDSTs);
     var dsts ={};
     for(let d = 0; d <fullDSTs.length; d++){
-        console.log(fullDSTs[d].split(" "));
         var obj = fullDSTs[d].split(" ")[-1];
         dsts[obj] = fullDSTs[d];
     }
     // update PPG column in contestDataTable based on values in playerMedians
-    console.log(dsts);
     for(let p of players){
         if(p.cells[1].innerHTML != "Name"){
             var name = p.cells[1].innerHTML;
@@ -1552,7 +1654,6 @@ function getPlayerMedians(){
             }else if(name in kickers){
                 p.cells[7].innerHTML = kickers[name]["FPS"];
             }else if(name in dsts) {
-                console.log(name);
                 var thisDST = defenses[dsts[name]];
                 var fpts = 0;
                 fpts += thisDST["Sacks"]*1.5;
@@ -2027,7 +2128,6 @@ function getIdFromUpload(name, position){
     var rows = table.rows;
     var found = false;
     var x = 0;
-    //console.log(name, position);
     while(!found){
         if(rows[x].cells[1].innerHTML == name && (rows[x].cells[2].innerHTML == position || (position == "FLEX" && (rows[x].cells[2].innerHTML == "RB" || rows[x].cells[2].innerHTML == "WR" || rows[x].cells[2].innerHTML == "TE")))){
             found = true;
@@ -2360,17 +2460,17 @@ function addInjured(){
     var table = document.getElementById("injuryTable");
     var row = table.insertRow(-1);
     var cell = row.insertCell(-1);
-    cell.innerHTML = '<input list="players" class="injuryName injury" onchange="updateInjuryTable()">';
+    cell.innerHTML = '<input list="playersList" class="injuryName injury" onchange="updateInjuryTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<input list="players" class="injuryB1 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB1Pct injury" onchange="updateInjuryTable()">';
+    cell.innerHTML = '<input list="playersList" class="injuryB1 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB1Pct injury" onchange="updateInjuryTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<input list="players" class="injuryB2 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB2Pct injury" onchange="updateInjuryTable()">';
+    cell.innerHTML = '<input list="playersList" class="injuryB2 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB2Pct injury" onchange="updateInjuryTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<input list="players" class="injuryB3 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB3Pct injury" onchange="updateInjuryTable()">';
+    cell.innerHTML = '<input list="playersList" class="injuryB3 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB3Pct injury" onchange="updateInjuryTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<input list="players" class="injuryB4 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB4Pct injury" onchange="updateInjuryTable()">';
+    cell.innerHTML = '<input list="playersList" class="injuryB4 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB4Pct injury" onchange="updateInjuryTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<input list="players" class="injuryB5 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB5Pct injury" onchange="updateInjuryTable()">';
+    cell.innerHTML = '<input list="playersList" class="injuryB5 injury" onchange="updateInjuryTable()"><input type="number" class="injuryB5Pct injury" onchange="updateInjuryTable()">';
     cell = row.insertCell(-1);
     cell.innerHTML = '<button onclick="removeRow(this)">Remove</button>';
 
@@ -2409,17 +2509,17 @@ function getInjuryTable(){
     for(let i of injuries){
         var row = table.insertRow(-1);
         var cell = row.insertCell(-1);
-        cell.innerHTML = '<input list="players" class="injuryName injury" onchange="updateInjuryTable()" value="'+i.name+'">';
+        cell.innerHTML = '<input list="playersList" class="injuryName injury" onchange="updateInjuryTable()" value="'+i.name+'">';
         cell = row.insertCell(-1);
-        cell.innerHTML = '<input list="players" class="injuryB1 injury" onchange="updateInjuryTable()" value="'+i.b1+'"><input type="number" class="injuryB1Pct injury" onchange="updateInjuryTable()" value="'+i.b1Pct+'">';
+        cell.innerHTML = '<input list="playersList" class="injuryB1 injury" onchange="updateInjuryTable()" value="'+i.b1+'"><input type="number" class="injuryB1Pct injury" onchange="updateInjuryTable()" value="'+i.b1Pct+'">';
         cell = row.insertCell(-1);
-        cell.innerHTML = '<input list="players" class="injuryB2 injury" onchange="updateInjuryTable()" value="'+i.b2+'"><input type="number" class="injuryB2Pct injury" onchange="updateInjuryTable()" value="'+i.b2Pct+'">';
+        cell.innerHTML = '<input list="playersList" class="injuryB2 injury" onchange="updateInjuryTable()" value="'+i.b2+'"><input type="number" class="injuryB2Pct injury" onchange="updateInjuryTable()" value="'+i.b2Pct+'">';
         cell = row.insertCell(-1);
-        cell.innerHTML = '<input list="players" class="injuryB3 injury" onchange="updateInjuryTable()" value="'+i.b3+'"><input type="number" class="injuryB3Pct injury" onchange="updateInjuryTable()" value="'+i.b3Pct+'">';
+        cell.innerHTML = '<input list="playersList" class="injuryB3 injury" onchange="updateInjuryTable()" value="'+i.b3+'"><input type="number" class="injuryB3Pct injury" onchange="updateInjuryTable()" value="'+i.b3Pct+'">';
         cell = row.insertCell(-1);
-        cell.innerHTML = '<input list="players" class="injuryB4 injury" onchange="updateInjuryTable()" value="'+i.b4+'"><input type="number" class="injuryB4Pct injury" onchange="updateInjuryTable()" value="'+i.b4Pct+'">';
+        cell.innerHTML = '<input list="playersList" class="injuryB4 injury" onchange="updateInjuryTable()" value="'+i.b4+'"><input type="number" class="injuryB4Pct injury" onchange="updateInjuryTable()" value="'+i.b4Pct+'">';
         cell = row.insertCell(-1);
-        cell.innerHTML = '<input list="players" class="injuryB5 injury" onchange="updateInjuryTable()" value="'+i.b5+'"><input type="number" class="injuryB5Pct injury" onchange="updateInjuryTable()" value="'+i.b5Pct+'">';
+        cell.innerHTML = '<input list="playersList" class="injuryB5 injury" onchange="updateInjuryTable()" value="'+i.b5+'"><input type="number" class="injuryB5Pct injury" onchange="updateInjuryTable()" value="'+i.b5Pct+'">';
         cell = row.insertCell(-1);
         cell.innerHTML = '<button onclick="removeRow(this)">Remove</button>';
     }
@@ -2464,7 +2564,6 @@ function adjustProjectionsByInjuries(){
             // continue if p is not a tr element
             if(p.tagName != "TR") continue;
 
-            //console.log(p);
             if(p.cells[1].innerHTML.trim() == i.b1.trim()){
                 var b1Projections = JSON.parse(p.cells[9].getAttribute("projections"));
                 var newProj = addInjuryBenefit(playerProjections, b1Projections, i.b1Pct);
@@ -2570,17 +2669,17 @@ function addSteal(){
     var table = document.getElementById("stealTable");
     var row = table.insertRow(-1);
     var cell = row.insertCell(-1);
-    cell.innerHTML = '<input list="players" class="stealName steal" onchange="updatestealTable()">';
+    cell.innerHTML = '<input list="playersList" class="stealName steal" onchange="updatestealTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<input list="players" class="stealB1 steal" onchange="updatestealTable()"><input type="number" class="stealB1Pct steal" onchange="updatestealTable()">';
+    cell.innerHTML = '<input list="playersList" class="stealB1 steal" onchange="updatestealTable()"><input type="number" class="stealB1Pct steal" onchange="updatestealTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<input list="players" class="stealB2 steal" onchange="updatestealTable()"><input type="number" class="stealB2Pct steal" onchange="updatestealTable()">';
+    cell.innerHTML = '<input list="playersList" class="stealB2 steal" onchange="updatestealTable()"><input type="number" class="stealB2Pct steal" onchange="updatestealTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<input list="players" class="stealB3 steal" onchange="updatestealTable()"><input type="number" class="stealB3Pct steal" onchange="updatestealTable()">';
+    cell.innerHTML = '<input list="playersList" class="stealB3 steal" onchange="updatestealTable()"><input type="number" class="stealB3Pct steal" onchange="updatestealTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<input list="players" class="stealB4 steal" onchange="updatestealTable()"><input type="number" class="stealB4Pct steal" onchange="updatestealTable()">';
+    cell.innerHTML = '<input list="playersList" class="stealB4 steal" onchange="updatestealTable()"><input type="number" class="stealB4Pct steal" onchange="updatestealTable()">';
     cell = row.insertCell(-1);
-    cell.innerHTML = '<input list="players" class="stealB5 steal" onchange="updatestealTable()"><input type="number" class="stealB5Pct steal" onchange="updatestealTable()">';
+    cell.innerHTML = '<input list="playersList" class="stealB5 steal" onchange="updatestealTable()"><input type="number" class="stealB5Pct steal" onchange="updatestealTable()">';
     cell = row.insertCell(-1);
     cell.innerHTML = '<button onclick="removeRow(this)">Remove</button>';
 
@@ -2633,17 +2732,17 @@ function getStealTable(){
     for(let i of stolen){
         var row = table.insertRow(-1);
         var cell = row.insertCell(-1);
-        cell.innerHTML = '<input list="players" class="stealName steal" onchange="updatestealTable()" value="'+i.name+'">';
+        cell.innerHTML = '<input list="playersList" class="stealName steal" onchange="updatestealTable()" value="'+i.name+'">';
         cell = row.insertCell(-1);
-        cell.innerHTML = '<input list="players" class="stealB1 steal" onchange="updatestealTable()" value="'+i.b1+'"><input type="number" class="stealB1Pct steal" onchange="updatestealTable()" value="'+i.b1Pct+'">';
+        cell.innerHTML = '<input list="playersList" class="stealB1 steal" onchange="updatestealTable()" value="'+i.b1+'"><input type="number" class="stealB1Pct steal" onchange="updatestealTable()" value="'+i.b1Pct+'">';
         cell = row.insertCell(-1);
-        cell.innerHTML = '<input list="players" class="stealB2 steal" onchange="updatestealTable()" value="'+i.b2+'"><input type="number" class="stealB2Pct steal" onchange="updatestealTable()" value="'+i.b2Pct+'">';
+        cell.innerHTML = '<input list="playersList" class="stealB2 steal" onchange="updatestealTable()" value="'+i.b2+'"><input type="number" class="stealB2Pct steal" onchange="updatestealTable()" value="'+i.b2Pct+'">';
         cell = row.insertCell(-1);
-        cell.innerHTML = '<input list="players" class="stealB3 steal" onchange="updatestealTable()" value="'+i.b3+'"><input type="number" class="stealB3Pct steal" onchange="updatestealTable()" value="'+i.b3Pct+'">';
+        cell.innerHTML = '<input list="playersList" class="stealB3 steal" onchange="updatestealTable()" value="'+i.b3+'"><input type="number" class="stealB3Pct steal" onchange="updatestealTable()" value="'+i.b3Pct+'">';
         cell = row.insertCell(-1);
-        cell.innerHTML = '<input list="players" class="stealB4 steal" onchange="updatestealTable()" value="'+i.b4+'"><input type="number" class="stealB4Pct steal" onchange="updatestealTable()" value="'+i.b4Pct+'">';
+        cell.innerHTML = '<input list="playersList" class="stealB4 steal" onchange="updatestealTable()" value="'+i.b4+'"><input type="number" class="stealB4Pct steal" onchange="updatestealTable()" value="'+i.b4Pct+'">';
         cell = row.insertCell(-1);
-        cell.innerHTML = '<input list="players" class="stealB5 steal" onchange="updatestealTable()" value="'+i.b5+'"><input type="number" class="stealB5Pct steal" onchange="updatestealTable()" value="'+i.b5Pct+'">';
+        cell.innerHTML = '<input list="playersList" class="stealB5 steal" onchange="updatestealTable()" value="'+i.b5+'"><input type="number" class="stealB5Pct steal" onchange="updatestealTable()" value="'+i.b5Pct+'">';
         cell = row.insertCell(-1);
         cell.innerHTML = '<button onclick="removeRow(this)">Remove</button>';
     }
