@@ -781,6 +781,42 @@ function buildLineups(){
             optimizeClassic(generateProjections());
         }
     }
+    finishOwnership();
+}
+
+function filterOwnershipByPosition(){
+    var ownershipTable = document.getElementById("ownership");
+    var rows = ownershipTable.rows;
+    var position = document.getElementById("ownershipPositionFilter").value;
+    for(let r of rows){
+        if(r.rowIndex == 0) continue;
+        if(r.cells[1].innerHTML != position && position != "All positions"){
+            r.style.display = "none";
+        }else{
+            r.style.display = "";
+        }
+    }
+}
+
+
+// Add positions to ownership table and show player pool size
+function finishOwnership(){
+    var ownershipTable = document.getElementById("ownership");
+    var playerPool = ownershipTable.rows.length-1;
+    
+    document.getElementById("poolSize").innerHTML = playerPool;
+
+    var ownershipRows = ownershipTable.rows;
+    var players = document.getElementById("contestDataTable").rows;
+    for(let r of ownershipRows){
+        if(r.rowIndex == 0) continue;
+        var name = r.cells[0].innerHTML;
+        for(let p of players){
+            if(p.cells[1].innerHTML == name){
+                r.cells[1].innerHTML = p.cells[2].innerHTML;
+            }
+        }
+    }
 }
 
 // Randomize projection
@@ -820,7 +856,7 @@ function randomizeProjection(projection, position, rushtds, rectds, ptds){
             break;
         case "WR":
             sd = thisProj * 0.6;
-            thisProj = Math.max(Math.min(thisProj, 10), 6.5);
+            sd = Math.max(Math.min(thisProj, 10), 6.5);
             tdTries = Math.ceil(rushtds*drives);
             tdChance = rushtds/tdTries;
             for(let i = 0; i < tdTries; i++){
@@ -834,7 +870,7 @@ function randomizeProjection(projection, position, rushtds, rectds, ptds){
             break;
         case "TE":
             sd = thisProj * 0.8;
-            thisProj = Math.min(thisProj, 10);
+            sd = Math.min(thisProj, 10);
             tdTries = Math.ceil(rushtds*drives);
             tdChance = rushtds/tdTries;
             for(let i = 0; i < tdTries; i++){
@@ -855,8 +891,8 @@ function randomizeProjection(projection, position, rushtds, rectds, ptds){
     }
 
     sd = Number(sd) * (1 + variance/10);
-
-    thisProj = thisProj + Number(sd)*(3*randomNormal()-1.5); ///gaussianRandom(thisProj, sd);
+    thisProj = gaussianRandom(thisProj, sd);
+    //thisProj = thisProj + Number(sd)*(3*randomNormal()-1.5); ///gaussianRandom(thisProj, sd);
 
     if(thisProj <= 0) return 0.5;
     return (Number(thisProj)).toFixed(1);
@@ -896,7 +932,7 @@ function optimizeClassic(players){
     var FLEXs = [];
     var DSTs = [];
     for(let p of players){
-        if(p.proj > 3){
+        if(p.proj > Number(document.getElementById("minProjection").value)){
             if(p.position == "QB"){
                 QBs.push(p);
             }else if(p.position == "RB"){
@@ -921,6 +957,7 @@ function optimizeClassic(players){
         modelVariables[p.name][pid] = 1;
         modelVariables[p.name][pstack] = minStack;
         modelVariables[p.name]["team"] = p.team;
+        modelVariables[p.name][p.team+"WRStack"] = 1;
     }
     for(let p of RBs){
         let pid = p.id;
@@ -937,6 +974,7 @@ function optimizeClassic(players){
         modelVariables[p.name][pid] = 1;
         modelVariables[p.name][pstack] = -1;
         modelVariables[p.name]["team"] = p.team;
+        modelVariables[p.name][p.team+"WRStack"] = -1;
     }
     for(let p of TEs){
         let pid = p.id;
@@ -945,6 +983,7 @@ function optimizeClassic(players){
         modelVariables[p.name][pid] = 1;
         modelVariables[p.name][pstack] = -1;
         modelVariables[p.name]["team"] = p.team;
+        modelVariables[p.name][p.team+"WRStack"] = -1;
     }
     for(let p of DSTs){
         let pid = p.id;
@@ -980,6 +1019,7 @@ function optimizeClassic(players){
             model.ints[p] = 1;
             if(!model.constraints[player.team+"QB"]) {
                 model.constraints[player.team+"QB"] = {"max": 0, "min": 1-maxStack};
+                model.constraints[player.team+"WRStack"] = {"max": '0'};
             }
         }
         results = solver.Solve(model);
@@ -1016,7 +1056,6 @@ function optimizeClassic(players){
             if(!alreadyBuilt && thisLineup.length == 9) setTimeout(addLineup(results, players), 500); else(optimizeClassic(generateProjections()));
         }
     });
-
 }
 
 // Get lineups that have already been built
@@ -1128,14 +1167,15 @@ function updateOwnership(){
             }
         }
     }
-    ownershipTable.innerHTML = "<tr><th>Player</th><th>Ownership</th></tr>";
+    ownershipTable.innerHTML = "<tr><th>Player</th><th>Position</th><th>Ownership</th></tr>";
 
     for(let p of Object.keys(players)){
         var row = ownershipTable.insertRow(-1);
         row.insertCell(0).innerHTML = p;
-        row.insertCell(1).innerHTML = (players[p]/lineupTable.rows.length*100).toFixed(1);
+        row.insertCell(1).innerHTML = "Loading..."
+        row.insertCell(2).innerHTML = (players[p]/lineupTable.rows.length*100).toFixed(1);
     }
-    sortTable("ownership", 1);
+    sortTable("ownership", 2);
 }
 
 
@@ -1182,9 +1222,14 @@ function generateProjections(){
     var contestDataTable = document.getElementById("contestDataTable");
     var contestTime = document.getElementById("select").value;
     var players = [];
+    var minProjection = document.getElementById('minProjection');
+
+    if(!minProjection.style.display || minProjection.style.display == ""){
+        minProjection = Number(minProjection.value);
+    } else minProjection = 0;
 
     for(let r of contestDataTable.rows){
-        if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position") && Number(r.cells[9].innerHTML) > 0){
+        if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position") && Number(r.cells[9].innerHTML) > minProjection){
             let rushTDOdds = 0;
             let recTDOdds = 0;
             let passTDOdds = 0;
@@ -1332,10 +1377,16 @@ function optimizeShowdown(players){
             modelVariables["CPT " + n] = {"proj": p.proj, "salary": p.salary, "CPT": '1', "i": '1'};
             modelVariables["CPT " + n][n] = '1';
             modelVariables["CPT " + n][t] = '1';
+            if(p.position == "QB"){
+                modelVariables["CPT " + n][t+"QBCPT"] = '1';
+            }
         }else{
             modelVariables[n] = {"proj": p.proj, "salary": p.salary, "i": '1'};
             modelVariables[n][n] = '1';
             modelVariables[n][t] = '1';
+            if(p.position == "WR"){
+                modelVariables[n][t+"QBCPT"] = '-1';
+            }
 
         }
 
@@ -1372,6 +1423,7 @@ function optimizeShowdown(players){
         }
         for(let t of teams){
             model.constraints[t] = {"max": '5'};
+            model.constraints[t+"QBCPT"] = {"max": '0'};
         }
 
         results = solver.Solve(model);
@@ -1409,7 +1461,6 @@ function optimizeShowdown(players){
             for(let l of builtLineups){
                 if(JSON.stringify(l) == JSON.stringify(flipLineup)) alreadyBuilt = true;
             }
-            console.log(flipLineup);
             if(!alreadyBuilt && thisLineup.length == 6) setTimeout(addLineupShowdown(thisLineup, modelVariables), 100); else(optimizeShowdown(generateProjections()));
         }
     });
@@ -2545,6 +2596,18 @@ function adjustProjectionsByInjuries(){
                 }
             }
         }
+        // find players with same name as injury
+        // want to rework this to incorporate "fixNames.json" for players whose names vary
+        // essentially, replace found with 
+        // var injured = players.filter(p => p.cells[1].innerHTML.trim() == i.name.trim());
+        // var b1 = players.filter(p => p.cells[1].innerHTML.trim() == i.b1.trim());
+        // var b2 = players.filter(p => p.cells[1].innerHTML.trim() == i.b2.trim());
+        // var b3 = players.filter(p => p.cells[1].innerHTML.trim() == i.b3.trim());
+        // var b4 = players.filter(p => p.cells[1].innerHTML.trim() == i.b4.trim());
+        // var b5 = players.filter(p => p.cells[1].innerHTML.trim() == i.b5.trim());
+        // find an array in fixNames that contains injured, b1, b2, b3, b4, b5
+        // if found, allow function to iterate though array to find a match to go with name in playerMedians
+
         var found = [];
         var x = 0;
         while(x < players.length){
@@ -2563,7 +2626,7 @@ function adjustProjectionsByInjuries(){
             if(p.rowIndex == 0) continue;
             // continue if p is not a tr element
             if(p.tagName != "TR") continue;
-
+            console.log(p.cells[1].innerHTML.trim());
             if(p.cells[1].innerHTML.trim() == i.b1.trim()){
                 var b1Projections = JSON.parse(p.cells[9].getAttribute("projections"));
                 var newProj = addInjuryBenefit(playerProjections, b1Projections, i.b1Pct);

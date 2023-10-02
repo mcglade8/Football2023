@@ -222,6 +222,7 @@
                 <button class="buildLineups classicBuilder" onclick="buildLineups()">Build Lineups</button><button class="buildLineups showdownBuilder" onclick="buildShowdownLineups()" style="display:none">Build Lineups</button><button onclick="clearLineups()">Clear Lineups</button>
                 <br><text class="classicBuilder">Min stack (not including QB): </text><input class="classicBuilder" type="number" id="minStack" value="1" min="0" max="4">
                 <br><text class="classicBuilder">Max stack (not including QB): </text><input class="classicBuilder" type="number" id="maxStack" value="2" min="0" max="4">
+                <br><text class="classicBuilder">Min projection: </text><input class="classicBuilder" type="number" id="minProjection" value="3" min="0">
                 <!-- Have user upload .csv of contest info they want to build for -->
                 <div class="csvSection">
                     <!--<label style="float:none" for="contestcsv">Import salaries: </label><input type="file" name="contestcsv" id="contestcsv" oninput="handlecsv('contestcsv')">-->
@@ -256,9 +257,22 @@
                     </table>
                 </div>
                 <div class="splitScreen">
+                    <button onclick="finishOwnership()">Finish Ownership</button>
+                    <br><text>Player pool size: <text id="poolSize">0</text></text>
+                    <br><text>Filter by position: </text>
+                        <select id="ownershipPositionFilter" onchange="filterOwnershipByPosition()">
+                            <option value="All positions">All positions</option>
+                            <option value="QB">QB</option>
+                            <option value="RB">RB</option>
+                            <option value="WR">WR</option>
+                            <option value="TE">TE</option>
+                            <option value="DST">DST</option>
+                        </select>
+                    <br>
                     <table id="ownership">
                         <thead>
                             <th>Player</th>
+                            <th>Position</th>
                             <th>Own %</th>
                         </thead>
                         <tbody>
