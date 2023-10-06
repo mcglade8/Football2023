@@ -139,3 +139,12 @@ label{
     width:100px;
     height:100px;
 }
+.cashOrGppButton[selected="true"]{
+    background: #098cf7;
+}
+.cashOrGppButton{
+    width: 100%;
+    height: 100%;
+    font-size:18px;
+    font-weight:700;
+}

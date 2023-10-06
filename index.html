@@ -24,6 +24,7 @@
             <button id="setTeamMediansInfo" class="tabButton">Team Medians</button>
             <button id="injuriesInfo" class="tabButton">Injuries</button>
             <button id="stealInfo" class="tabButton">Steal Usage</button>
+            <button id="cashOrGppInfo" class="tabButton">Cash or GPP</button> 
         </div>
         <div id="contest" class="contestDiv tabContent" style="display:block;width:100%">
             <div class="sectionHeader">
@@ -81,6 +82,7 @@
             
             <div id="playerAboutSection" style="text-align:center" class="splitScreen">
                 <h2>Player Data</h2>
+                
                 <div id="playerInfo">
                     <table style="width:100%" id="playerSummary">
                         <tr>
@@ -220,9 +222,12 @@
             <div id="builderControl" class="sectionHeader">
                 Lineups to build: <input type="number" id="lineupsToBuild" value="20" min="1">
                 <button class="buildLineups classicBuilder" onclick="buildLineups()">Build Lineups</button><button class="buildLineups showdownBuilder" onclick="buildShowdownLineups()" style="display:none">Build Lineups</button><button onclick="clearLineups()">Clear Lineups</button>
+                <br><text>Min cash plays: </text><input type="number" id="minCash" value="3" min="0">
+                <br><text>Min GPP plays: </text><input type="number" id="minGpp" value="3" min="0">
                 <br><text class="classicBuilder">Min stack (not including QB): </text><input class="classicBuilder" type="number" id="minStack" value="1" min="0" max="4">
                 <br><text class="classicBuilder">Max stack (not including QB): </text><input class="classicBuilder" type="number" id="maxStack" value="2" min="0" max="4">
                 <br><text class="classicBuilder">Min projection: </text><input class="classicBuilder" type="number" id="minProjection" value="3" min="0">
+                
                 <!-- Have user upload .csv of contest info they want to build for -->
                 <div class="csvSection">
                     <!--<label style="float:none" for="contestcsv">Import salaries: </label><input type="file" name="contestcsv" id="contestcsv" oninput="handlecsv('contestcsv')">-->
@@ -445,6 +450,25 @@
                     
                 </tbody>
             </table>
+        </div>
+        <div id="cashOrGpp" class="tabContent" style="display:none">
+            <div class="sectionHeader">
+                <h2>Mark each player as a cash or GPP play where appropriate</h2>
+            </div>
+            <button onclick="clearCashOrGpp()">Clear</button>
+            <table id="cashOrGppTable" class="tablesorter">
+                <thead>
+                    <th>Player</th>
+                    <th>Position</th>
+                    <th>Team</th>
+                    <th>Opponent</th>
+                    <th>Salary</th>
+                    <th>Cash</th>
+                    <th>GPP</th>
+                </thead>
+                <tbody>
+                    
+                </tbody>
         </div>
     </div>
     <script type="text/javascript" src="nflscript.js"></script>

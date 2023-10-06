@@ -139,7 +139,7 @@ $(function() {
     adjustProjectionsByStolen();
     captainize();
     createDatalist();
-
+    fillCashOrGpp();
 });
 
 // Create datalist of players for search bar
@@ -922,6 +922,12 @@ function gaussianRandom(mean=0, stdev=1) {
 function optimizeClassic(players){
     var minStack = Number(document.getElementById("minStack").value);
     var maxStack = Number(document.getElementById("maxStack").value);
+    var minCash = Number(document.getElementById("minCash").value);
+    var minGPP = Number(document.getElementById("minGpp").value);
+    var cashPlays = [];
+    var gppPlays = [];
+    if(localStorage.cashPlays != undefined) cashPlays = JSON.parse(localStorage.cashPlays);
+    if(localStorage.gppPlays != undefined) gppPlays = JSON.parse(localStorage.gppPlays);
     //var lineup = [];
     //var positions = ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "DST"];
     var salaryCap = 50000;
@@ -958,6 +964,8 @@ function optimizeClassic(players){
         modelVariables[p.name][pstack] = minStack;
         modelVariables[p.name]["team"] = p.team;
         modelVariables[p.name][p.team+"WRStack"] = 1;
+        if(cashPlays.includes(p.name)) modelVariables[p.name]["cash"] = 1;
+        if(gppPlays.includes(p.name)) modelVariables[p.name]["gpp"] = 1;
     }
     for(let p of RBs){
         let pid = p.id;
@@ -966,6 +974,8 @@ function optimizeClassic(players){
         modelVariables[p.name][pid] = 1;
         modelVariables[p.name][pstack] = -1;
         modelVariables[p.name]["team"] = p.team;
+        if(cashPlays.includes(p.name)) modelVariables[p.name]["cash"] = 1;
+        if(gppPlays.includes(p.name)) modelVariables[p.name]["gpp"] = 1;
     }
     for(let p of WRs){
         let pid = p.id;
@@ -975,6 +985,8 @@ function optimizeClassic(players){
         modelVariables[p.name][pstack] = -1;
         modelVariables[p.name]["team"] = p.team;
         modelVariables[p.name][p.team+"WRStack"] = -1;
+        if(cashPlays.includes(p.name)) modelVariables[p.name]["cash"] = 1;
+        if(gppPlays.includes(p.name)) modelVariables[p.name]["gpp"] = 1;
     }
     for(let p of TEs){
         let pid = p.id;
@@ -984,12 +996,16 @@ function optimizeClassic(players){
         modelVariables[p.name][pstack] = -1;
         modelVariables[p.name]["team"] = p.team;
         modelVariables[p.name][p.team+"WRStack"] = -1;
+        if(cashPlays.includes(p.name)) modelVariables[p.name]["cash"] = 1;
+        if(gppPlays.includes(p.name)) modelVariables[p.name]["gpp"] = 1;
     }
     for(let p of DSTs){
         let pid = p.id;
         modelVariables[p.name] = {"id": p.id,"proj": p.proj, "salary": p.salary, "DST": 1, "i": 1};
         modelVariables[p.name][pid] = 1;
         modelVariables[p.name]["team"] = p.team;
+        if(cashPlays.includes(p.name)) modelVariables[p.name]["cash"] = 1;
+        if(gppPlays.includes(p.name)) modelVariables[p.name]["gpp"] = 1;
     }
     
     var results;
@@ -1005,7 +1021,9 @@ function optimizeClassic(players){
                 "TE": {"min": 1},
                 "FLEX": {"equal": 7},
                 "DST": {"equal": 1},
-                "i": {"equal": 9}
+                "i": {"equal": 9},
+                "cash": {"min": minCash},
+                "gpp": {"min": minGPP}
             },  
             "variables": modelVariables,
             "ints": {}
@@ -1173,7 +1191,7 @@ function updateOwnership(){
         var row = ownershipTable.insertRow(-1);
         row.insertCell(0).innerHTML = p;
         row.insertCell(1).innerHTML = "Loading..."
-        row.insertCell(2).innerHTML = (players[p]/lineupTable.rows.length*100).toFixed(1);
+        row.insertCell(2).innerHTML = (players[p]/(lineupTable.rows.length-1)*100).toFixed(1);
     }
     sortTable("ownership", 2);
 }
@@ -1367,6 +1385,13 @@ function optimizeShowdown(players){
     //setTimeout(function(){return;}, 1000);
     var modelVariables = {};
     var teams = [];
+    var minCash = Number(document.getElementById("minCash").value);
+    var minGPP = Number(document.getElementById("minGpp").value);
+    var cashPlays = [];
+    var gppPlays = [];
+    if(localStorage.cashPlays != undefined) cashPlays = JSON.parse(localStorage.cashPlays);
+    if(localStorage.gppPlays != undefined) gppPlays = JSON.parse(localStorage.gppPlays);
+
     for(let p of players){
         //if(p.proj <= 0) continue;
         let n = p.name;
@@ -1380,6 +1405,8 @@ function optimizeShowdown(players){
             if(p.position == "QB"){
                 modelVariables["CPT " + n][t+"QBCPT"] = '1';
             }
+            if(cashPlays.includes(n)) modelVariables["CPT " + n]["cash"] = '1';
+            if(gppPlays.includes(n)) modelVariables["CPT " + n]["gpp"] = '1';
         }else{
             modelVariables[n] = {"proj": p.proj, "salary": p.salary, "i": '1'};
             modelVariables[n][n] = '1';
@@ -1387,8 +1414,11 @@ function optimizeShowdown(players){
             if(p.position == "WR"){
                 modelVariables[n][t+"QBCPT"] = '-1';
             }
+            if(cashPlays.includes(n)) modelVariables[n]["cash"] = '1';
+            if(gppPlays.includes(n)) modelVariables[n]["gpp"] = '1';
 
         }
+        
 
     }
 
@@ -1409,7 +1439,9 @@ function optimizeShowdown(players){
             "constraints": {
                 "salary": {"max": 50000},
                 "i": {"equal": 6},
-                "CPT": {"equal": 1}
+                "CPT": {"equal": 1},
+                "cash": {"min": minCash},
+                "gpp": {"min": minGPP}
             },  
             "variables": modelVariables,
             "ints": {}
@@ -1549,7 +1581,7 @@ function addLineupShowdown(lineup,players){
         let name = p.name.replace("CPT ", "");
         let team = "";
         for(let k of Object.keys(p)){
-            if((k.length == 3 || k.length == 2) && k != "CPT") team = k;
+            if((k.length == 3 || k.length == 2) && k != "CPT" && k != "gpp") team = k;
         }
 
         cell.innerHTML = name + "<br>" + team + "<br>" + Number(p.salary) + "<br>" + Number(p.proj).toFixed(1);
@@ -1598,9 +1630,9 @@ function updateShowdownOwnership(){
         if(players[p].flex > 0 || players[p].cpt > 0){
             var row = ownershipTable.insertRow(-1);
             row.insertCell(-1).innerHTML = p;
-            row.insertCell(-1).innerHTML = (players[p].cpt/table.rows.length*100).toFixed(1);
-            row.insertCell(-1).innerHTML = (players[p].flex/table.rows.length*100).toFixed(1);
-            row.insertCell(-1).innerHTML = ((players[p].cpt+players[p].flex)/table.rows.length*100).toFixed(1);
+            row.insertCell(-1).innerHTML = (players[p].cpt/(table.rows.length-1)*100).toFixed(1);
+            row.insertCell(-1).innerHTML = (players[p].flex/(table.rows.length-1)*100).toFixed(1);
+            row.insertCell(-1).innerHTML = ((players[p].cpt+players[p].flex)/(table.rows.length-1)*100).toFixed(1);
         }
     }
     sortTable("showdownOwnership", 3);
@@ -2387,8 +2419,10 @@ function getSecondaryColor(team){
 // Color table rows based on team
 function colorTableRows(){  
     var t = document.getElementById("contestDataTable");
+    var othert = document.getElementById("cashOrGppTable");
+    var allTables = [t, othert];
     //var allTables = document.getElementsByTagName("table"); // This works, but is disorienting on some tables
-    //for(let t of allTables){
+    for(let t of allTables){
         // find header "Team"
         var ths = t.getElementsByTagName("th");
         var teamIndex = 0;
@@ -2405,7 +2439,7 @@ function colorTableRows(){
             r.style.backgroundColor = getPrimaryColor(team);
             r.style.color = getSecondaryColor(team);
         }
-    //}
+    }
 }
 
 // Set defense projections based on defensesTable data; setting K data by this as well
@@ -2922,5 +2956,97 @@ function updateFromSteal(playerProjections, oldProj, newProj){
 // Clear injuries table
 function clearSteal(){
     localStorage.stolen = JSON.stringify([]);
+    location.reload();
+}
+
+// Fill cash or GPP table with players and buttons to assign them to cash or GPP
+function fillCashOrGpp(){
+    var cogTable = document.getElementById("cashOrGppTable");
+    var players = document.getElementById("contestDataTable").rows;
+    var names = [];
+    var positions = [];
+    var teams = [];
+    var opponents = [];
+    var salaries = [];
+    for(let p of players){
+        if(p.rowIndex == 0 || names.includes(p.cells[1].innerHTML.trim())) continue;
+        names.push(p.cells[1].innerHTML.trim());
+        positions.push(p.cells[2].innerHTML.trim());
+        teams.push(p.cells[3].innerHTML.trim());
+        opponents.push(p.cells[4].innerHTML.trim());
+        salaries.push(p.cells[5].innerHTML.trim());
+    }
+    var cashPlays = [];
+    if(localStorage.cashPlays) cashPlays = JSON.parse(localStorage.cashPlays);
+    var gppPlays = [];
+    if(localStorage.gppPlays) gppPlays = JSON.parse(localStorage.gppPlays);
+
+    for(let n of names){
+        var row = cogTable.insertRow(-1);
+        var cell = row.insertCell(-1);
+        cell.innerHTML = n;
+        cell = row.insertCell(-1);
+        cell.innerHTML = positions[names.indexOf(n)];
+        cell = row.insertCell(-1);
+        cell.innerHTML = teams[names.indexOf(n)];
+        cell = row.insertCell(-1);
+        cell.innerHTML = opponents[names.indexOf(n)];
+        cell = row.insertCell(-1);
+        cell.innerHTML = salaries[names.indexOf(n)];
+        cell = row.insertCell(-1);
+        if(cashPlays.includes(n)){
+            cell.innerHTML = '<button onclick="toggleCash(this)" class="cashOrGppButton" selected="true">Cash</button>';
+        }else{
+            cell.innerHTML = '<button onclick="toggleCash(this)" class="cashOrGppButton" selected="false">Cash</button>';
+        }
+        cell.style.backgroundColor = "white";
+        cell = row.insertCell(-1);
+        if(gppPlays.includes(n)){
+            cell.innerHTML = '<button onclick="toggleGpp(this)" class="cashOrGppButton" selected="true">GPP</button>';
+        }else{
+            cell.innerHTML = '<button onclick="toggleGpp(this)" class="cashOrGppButton" selected="false">GPP</button>';
+        }
+        cell.style.backgroundColor = "white";
+    }
+
+}
+
+// Toggle cash designation for player
+function toggleCash(btn){
+    var player = btn.parentNode.parentNode.cells[0].innerHTML;
+    var cashPlays = [];
+    if(localStorage.cashPlays) cashPlays = JSON.parse(localStorage.cashPlays);
+    if(btn.getAttribute("selected") == "true"){
+        btn.setAttribute("selected", "false");
+        btn.innerHTML = "Cash";
+        cashPlays.splice(cashPlays.indexOf(player), 1);
+    } else{
+        btn.setAttribute("selected", "true");
+        btn.innerHTML = "Cash";
+        cashPlays.push(player);
+    }
+    localStorage.cashPlays = JSON.stringify(cashPlays);
+}
+
+// Toggle GPP designation for player
+function toggleGpp(btn){
+    var player = btn.parentNode.parentNode.cells[0].innerHTML;
+    var gppPlays = [];
+    if(localStorage.gppPlays) gppPlays = JSON.parse(localStorage.gppPlays);
+    if(btn.getAttribute("selected") == "true"){
+        btn.setAttribute("selected", "false");
+        btn.innerHTML = "GPP";
+        gppPlays.splice(gppPlays.indexOf(player), 1);
+    } else{
+        btn.setAttribute("selected", "true");
+        btn.innerHTML = "GPP";
+        gppPlays.push(player);
+    }
+    localStorage.gppPlays = JSON.stringify(gppPlays);
+}
+
+function clearCashOrGpp(){
+    localStorage.cashPlays = JSON.stringify([]);
+    localStorage.gppPlays = JSON.stringify([]);
     location.reload();
 }
