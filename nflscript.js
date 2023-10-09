@@ -139,8 +139,45 @@ $(function() {
     adjustProjectionsByStolen();
     captainize();
     createDatalist();
+    addOwnershipProjections();
     fillCashOrGpp();
+    fillCashOrGppTeam();
 });
+
+// Add ownership projections for classic based on proj/salary (lm from R per position)
+function addOwnershipProjections(){
+    var table = document.getElementById("contestDataTable");
+    var rows = table.rows;
+    for(let r of rows){
+        if(r.rowIndex == 0) continue;
+        let pos = r.cells[2].innerHTML;
+        let sal = Number(r.cells[5].innerHTML);
+        let proj = Number(r.cells[9].innerHTML);
+        let own = 0;
+        switch(pos){
+            case "QB":
+                own = sal*0.00001948 + proj * 0.002175 - sal*proj*0.00000009096 - 0.09357;
+                break;
+            case "RB":
+                own = sal*0.00001045 + proj * 0.008585 - sal*proj*0.0000005783 - 0.05981;
+                break;
+            case "WR":
+                own = -sal*0.000004619 + proj * 0.004165 + sal*proj*0.0000005462 + 0.0000005462;
+                break;
+            case "TE":
+                own = sal*0.000008017 + proj * 0.0002436 + sal*proj*0.000001507 + 0.01475;
+                break;
+            case "DST":
+                own = sal*0.00001948 + proj * 0.002175 + sal*proj*0.00000009096 - 0.09357;
+                break;
+            default:
+                own = 0;
+                break;
+        }
+        own = (own*100).toFixed(1);
+        r.insertCell(-1).innerHTML = own;
+    }
+}
 
 // Create datalist of players for search bar
 function createDatalist(){
@@ -605,6 +642,7 @@ function sortTable(t, c){
     }
     colorTableRows();
     getPositionProjections();
+    filterCashOrGpp();
 }
 
 // Sort contestDataTable by projected points
@@ -924,13 +962,18 @@ function optimizeClassic(players){
     var maxStack = Number(document.getElementById("maxStack").value);
     var minCash = Number(document.getElementById("minCash").value);
     var minGPP = Number(document.getElementById("minGpp").value);
+    var minboth = minCash + minGPP;
     var cashPlays = [];
     var gppPlays = [];
     if(localStorage.cashPlays != undefined) cashPlays = JSON.parse(localStorage.cashPlays);
     if(localStorage.gppPlays != undefined) gppPlays = JSON.parse(localStorage.gppPlays);
     //var lineup = [];
     //var positions = ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "DST"];
-    var salaryCap = 50000;
+    var minSalary = Number(document.getElementById("minSalaryClassic").value);
+    var salaryCap = Number(document.getElementById("maxSalaryClassic").value);
+    var minOwnership = Number(document.getElementById("minOwnershipClassic").value);
+    var maxOwnership = Number(document.getElementById("maxOwnershipClassic").value);
+    
     var QBs = [];
     var RBs = [];
     var WRs = [];
@@ -959,53 +1002,58 @@ function optimizeClassic(players){
     for(let p of QBs){
         let pid = p.id;
         let pstack = p.team+"QB";
-        modelVariables[p.name] = {"proj": p.proj, "salary": p.salary, "QB": 1, "i": 1};
+        modelVariables[p.name] = {"proj": p.proj, "salary": p.salary, "QB": 1, "i": 1, "own": p.own};
         modelVariables[p.name][pid] = 1;
-        modelVariables[p.name][pstack] = minStack;
+        modelVariables[p.name][pstack] = minStack-0.5;
         modelVariables[p.name]["team"] = p.team;
         modelVariables[p.name][p.team+"WRStack"] = 1;
         if(cashPlays.includes(p.name)) modelVariables[p.name]["cash"] = 1;
         if(gppPlays.includes(p.name)) modelVariables[p.name]["gpp"] = 1;
+        if(cashPlays.includes(p.name) || gppPlays.includes(p.name)) modelVariables[p.name]["cog"] = 1;
     }
     for(let p of RBs){
         let pid = p.id;
         let pstack = p.team+"QB";
-        modelVariables[p.name] = {"id": p.id, "proj": p.proj, "salary": p.salary, "RB": 1, "FLEX": 1, "i": 1};
+        modelVariables[p.name] = {"id": p.id, "proj": p.proj, "salary": p.salary, "RB": 1, "FLEX": 1, "i": 1, "own": p.own};
         modelVariables[p.name][pid] = 1;
         modelVariables[p.name][pstack] = -1;
         modelVariables[p.name]["team"] = p.team;
         if(cashPlays.includes(p.name)) modelVariables[p.name]["cash"] = 1;
         if(gppPlays.includes(p.name)) modelVariables[p.name]["gpp"] = 1;
+        if(cashPlays.includes(p.name) || gppPlays.includes(p.name)) modelVariables[p.name]["cog"] = 1;
     }
     for(let p of WRs){
         let pid = p.id;
         let pstack = p.team+"QB";
-        modelVariables[p.name] = {"id": p.id, "proj": p.proj, "salary": p.salary, "WR": 1, "FLEX": 1, "i": 1};
+        modelVariables[p.name] = {"id": p.id, "proj": p.proj, "salary": p.salary, "WR": 1, "FLEX": 1, "i": 1, "own": p.own};
         modelVariables[p.name][pid] = 1;
         modelVariables[p.name][pstack] = -1;
         modelVariables[p.name]["team"] = p.team;
         modelVariables[p.name][p.team+"WRStack"] = -1;
         if(cashPlays.includes(p.name)) modelVariables[p.name]["cash"] = 1;
-        if(gppPlays.includes(p.name)) modelVariables[p.name]["gpp"] = 1;
+        if(gppPlays.includes(p.name)) modelVariables[p.name]["gpp"] = 1;        
+        if(cashPlays.includes(p.name) || gppPlays.includes(p.name)) modelVariables[p.name]["cog"] = 1;
     }
     for(let p of TEs){
         let pid = p.id;
         let pstack = p.team+"QB";
-        modelVariables[p.name] = {"id": p.id,"proj": p.proj, "salary": p.salary, "TE": 1, "FLEX": 1, "i": 1};
+        modelVariables[p.name] = {"id": p.id,"proj": p.proj, "salary": p.salary, "TE": 1, "FLEX": 1, "i": 1, "own": p.own};
         modelVariables[p.name][pid] = 1;
         modelVariables[p.name][pstack] = -1;
         modelVariables[p.name]["team"] = p.team;
         modelVariables[p.name][p.team+"WRStack"] = -1;
         if(cashPlays.includes(p.name)) modelVariables[p.name]["cash"] = 1;
         if(gppPlays.includes(p.name)) modelVariables[p.name]["gpp"] = 1;
+        if(cashPlays.includes(p.name) || gppPlays.includes(p.name)) modelVariables[p.name]["cog"] = 1;
     }
     for(let p of DSTs){
         let pid = p.id;
-        modelVariables[p.name] = {"id": p.id,"proj": p.proj, "salary": p.salary, "DST": 1, "i": 1};
+        modelVariables[p.name] = {"id": p.id,"proj": p.proj, "salary": p.salary, "DST": 1, "i": 1, "own": p.own};
         modelVariables[p.name][pid] = 1;
         modelVariables[p.name]["team"] = p.team;
         if(cashPlays.includes(p.name)) modelVariables[p.name]["cash"] = 1;
         if(gppPlays.includes(p.name)) modelVariables[p.name]["gpp"] = 1;
+        if(cashPlays.includes(p.name) || gppPlays.includes(p.name)) modelVariables[p.name]["cog"] = 1;
     }
     
     var results;
@@ -1014,16 +1062,18 @@ function optimizeClassic(players){
             "optimize": "proj",
             "opType": "max",
             "constraints": {
-                "salary": {"max": salaryCap},
+                "salary": {"max": salaryCap, "min": minSalary},
                 "QB": {"equal": 1},
                 "RB": {"min": 2},
                 "WR": {"min": 3},
-                "TE": {"min": 1},
+                "TE": {"equal": 1},
                 "FLEX": {"equal": 7},
                 "DST": {"equal": 1},
                 "i": {"equal": 9},
                 "cash": {"min": minCash},
-                "gpp": {"min": minGPP}
+                "gpp": {"min": minGPP},
+                "cog": {"min": minboth}, // If a player can be either, still need to meet minCash and minGPP combined total
+                "own": {"max": maxOwnership, "min": minOwnership}
             },  
             "variables": modelVariables,
             "ints": {}
@@ -1279,7 +1329,8 @@ function generateProjections(){
                 'passTDOdds': passTDOdds, 
                 'rushYards': rushYards, 
                 'recYards': recYards,
-                'rosterPosition': rosterPosition
+                'rosterPosition': rosterPosition,
+                'own': r.cells[10].innerHTML
             };
             
             // Assign a value proj using the randomizeProjection function
@@ -1399,14 +1450,20 @@ function optimizeShowdown(players){
         if(!teams.includes(t)) teams.push(t);
                 
         if(p.rosterPosition == "CPT"){
-            modelVariables["CPT " + n] = {"proj": p.proj, "salary": p.salary, "CPT": '1', "i": '1'};
+            modelVariables["CPT " + n] = {"proj": p.proj, "salary": p.salary, "CPT": '2', "i": '1'};
             modelVariables["CPT " + n][n] = '1';
             modelVariables["CPT " + n][t] = '1';
             if(p.position == "QB"){
                 modelVariables["CPT " + n][t+"QBCPT"] = '1';
             }
-            if(cashPlays.includes(n)) modelVariables["CPT " + n]["cash"] = '1';
-            if(gppPlays.includes(n)) modelVariables["CPT " + n]["gpp"] = '1';
+            if(cashPlays.includes(n)){
+                modelVariables["CPT " + n]["cash"] = '1';
+                modelVariables["CPT " + n]["CPT"] = '1';
+            }
+            if(gppPlays.includes(n)){
+                modelVariables["CPT " + n]["gpp"] = '1';
+                modelVariables["CPT " + n]["CPT"] = '1';
+            }
         }else{
             modelVariables[n] = {"proj": p.proj, "salary": p.salary, "i": '1'};
             modelVariables[n][n] = '1';
@@ -2968,6 +3025,8 @@ function fillCashOrGpp(){
     var teams = [];
     var opponents = [];
     var salaries = [];
+    var projections = [];
+    var values = [];
     for(let p of players){
         if(p.rowIndex == 0 || names.includes(p.cells[1].innerHTML.trim())) continue;
         names.push(p.cells[1].innerHTML.trim());
@@ -2975,6 +3034,8 @@ function fillCashOrGpp(){
         teams.push(p.cells[3].innerHTML.trim());
         opponents.push(p.cells[4].innerHTML.trim());
         salaries.push(p.cells[5].innerHTML.trim());
+        projections.push(p.cells[9].innerHTML.trim());
+        values.push((Number(p.cells[9].innerHTML.trim())/Number(p.cells[5].innerHTML.trim())*1000).toFixed(1));
     }
     var cashPlays = [];
     if(localStorage.cashPlays) cashPlays = JSON.parse(localStorage.cashPlays);
@@ -2992,7 +3053,11 @@ function fillCashOrGpp(){
         cell = row.insertCell(-1);
         cell.innerHTML = opponents[names.indexOf(n)];
         cell = row.insertCell(-1);
+        cell.innerHTML = projections[names.indexOf(n)];
+        cell = row.insertCell(-1);
         cell.innerHTML = salaries[names.indexOf(n)];
+        cell = row.insertCell(-1);
+        cell.innerHTML = values[names.indexOf(n)];
         cell = row.insertCell(-1);
         if(cashPlays.includes(n)){
             cell.innerHTML = '<button onclick="toggleCash(this)" class="cashOrGppButton" selected="true">Cash</button>';
@@ -3049,4 +3114,38 @@ function clearCashOrGpp(){
     localStorage.cashPlays = JSON.stringify([]);
     localStorage.gppPlays = JSON.stringify([]);
     location.reload();
+}
+
+// Fill select with teams
+function fillCashOrGppTeam(){
+    var select = document.getElementById('cashOrGppTeam');
+    var teams = [];
+    var players = document.getElementById("contestDataTable").rows;
+    for(let p of players){
+        if(p.rowIndex == 0 || teams.includes(p.cells[3].innerHTML.trim())) continue;
+        teams.push(p.cells[3].innerHTML.trim());
+    }
+    for(let t of teams){
+        var option = document.createElement("option");
+        option.text = t;
+        select.add(option);
+    }
+}
+
+// Filter cashOrGpp table by selections
+function filterCashOrGpp(){
+    var teamSelect = document.getElementById('cashOrGppTeam').value;
+    var posSelect= document.getElementById('cashOrGppPosition').value;
+    var table = document.getElementById("cashOrGppTable");
+    var rows = table.rows;
+    for(let r of rows){
+        if(r.rowIndex == 0) continue;
+        if(teamSelect != "All" && r.cells[2].innerHTML != teamSelect){
+            r.style.display = "none";
+        }else if(posSelect != "All" && r.cells[1].innerHTML != posSelect){
+            r.style.display = "none";
+        }else{
+            r.style.display = "";
+        }
+    }
 }

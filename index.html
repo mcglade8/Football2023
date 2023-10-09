@@ -74,6 +74,7 @@
                             <th>PPG</th>
                             <th>Slate</th>
                             <th>Projection</th>
+                            <th>Own</th>
                         </tr>
 
                     </table>
@@ -226,7 +227,9 @@
                 <br><text>Min GPP plays: </text><input type="number" id="minGpp" value="3" min="0">
                 <br><text class="classicBuilder">Min stack (not including QB): </text><input class="classicBuilder" type="number" id="minStack" value="1" min="0" max="4">
                 <br><text class="classicBuilder">Max stack (not including QB): </text><input class="classicBuilder" type="number" id="maxStack" value="2" min="0" max="4">
-                <br><text class="classicBuilder">Min projection: </text><input class="classicBuilder" type="number" id="minProjection" value="3" min="0">
+                <br><text class="classicBuilder">Salary range: </text><input class="classicBuilder" type="number" id="minSalaryClassic" value="49000" min="0" max="49900"><input class="classicBuilder" type="number" id="maxSalaryClassic" value="50000" min="0" max="50000">
+                <br><text class="classicBuilder">Ownership range: </text><input class="classicBuilder" type="number" id="minOwnershipClassic" value="80" min="0"><input class="classicBuilder" type="number" id="maxOwnershipClassic" value="115" min="0">
+                <br><text class="classicBuilder">Min projection: </text><input class="classicBuilder" type="number" id="minProjection" value="5" min="0">
                 
                 <!-- Have user upload .csv of contest info they want to build for -->
                 <div class="csvSection">
@@ -454,15 +457,32 @@
         <div id="cashOrGpp" class="tabContent" style="display:none">
             <div class="sectionHeader">
                 <h2>Mark each player as a cash or GPP play where appropriate</h2>
+                <h4>Showdown Note: CPT pool will only contain players marked as Cash or GPP</h4>
             </div>
             <button onclick="clearCashOrGpp()">Clear</button>
+            <select id="cashOrGppTeam" onchange="filterCashOrGpp()">
+                <option value="All">All</option>
+            </select>
+            <select id="cashOrGppPosition" onchange="filterCashOrGpp()">
+                <option value="All">All</option>
+                <option value="QB">QB</option>
+                <option value="RB">RB</option>
+                <option value="WR">WR</option>
+                <option value="TE">TE</option>
+                <option value="DST">DST</option>
+                <option value="K">K</option>
+                <option value="CPT">CPT</option>
+                <option value="FLEX">FLEX</option>
+            </select>
             <table id="cashOrGppTable" class="tablesorter">
                 <thead>
                     <th>Player</th>
                     <th>Position</th>
                     <th>Team</th>
                     <th>Opponent</th>
+                    <th>Projection</th>
                     <th>Salary</th>
+                    <th>Value</th>
                     <th>Cash</th>
                     <th>GPP</th>
                 </thead>
