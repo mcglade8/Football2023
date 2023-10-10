@@ -142,6 +142,8 @@ $(function() {
     addOwnershipProjections();
     fillCashOrGpp();
     fillCashOrGppTeam();
+    fillMatchupsTable();
+    applyMatchupAdjustments();
 });
 
 // Add ownership projections for classic based on proj/salary (lm from R per position)
@@ -1292,12 +1294,13 @@ function generateProjections(){
     var players = [];
     var minProjection = document.getElementById('minProjection');
 
+    /* Deprecating due to new minProjection feature in optimizeShowdown (needs to be built into optimizeClassic too)
     if(!minProjection.style.display || minProjection.style.display == ""){
         minProjection = Number(minProjection.value);
-    } else minProjection = 0;
+    } else minProjection = 0; */
 
     for(let r of contestDataTable.rows){
-        if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position") && Number(r.cells[9].innerHTML) > minProjection){
+        if(r.cells[8].innerHTML == contestTime && !r.cells[2].innerHTML.includes("Position")){// && Number(r.cells[9].innerHTML) > minProjection){
             let rushTDOdds = 0;
             let recTDOdds = 0;
             let passTDOdds = 0;
@@ -1309,7 +1312,7 @@ function generateProjections(){
             if(pos == "FLEX" || pos == "CPT"){ 
                 pos = r.cells[2].getAttribute("pos").toUpperCase();     
             }
-            if(r.cells[9].getAttribute("projections") != null && r.cells[9].getAttribute("projections") != undefined){
+            if(r.cells[9].getAttribute("projections") != null && r.cells[9].getAttribute("projections") != undefined && r.cells[9].getAttribute("projections") != ""){
                 let projections = JSON.parse(r.cells[9].getAttribute("projections"));
                 rushYards = Number(projections["Rushing Yards"]);
                 recYards = Number(projections["Receiving Yards"]);
@@ -1438,6 +1441,8 @@ function optimizeShowdown(players){
     var teams = [];
     var minCash = Number(document.getElementById("minCash").value);
     var minGPP = Number(document.getElementById("minGpp").value);
+    var maxDarts = Number(document.getElementById("maxDarts").value);
+    var minProjection = Number(document.getElementById("minProjection").value);
     var cashPlays = [];
     var gppPlays = [];
     if(localStorage.cashPlays != undefined) cashPlays = JSON.parse(localStorage.cashPlays);
@@ -1464,6 +1469,9 @@ function optimizeShowdown(players){
                 modelVariables["CPT " + n]["gpp"] = '1';
                 modelVariables["CPT " + n]["CPT"] = '1';
             }
+            if(p.proj < minProjection){
+                modelVariables["CPT " + n]["dart"] = '1';
+            }
         }else{
             modelVariables[n] = {"proj": p.proj, "salary": p.salary, "i": '1'};
             modelVariables[n][n] = '1';
@@ -1473,15 +1481,18 @@ function optimizeShowdown(players){
             }
             if(cashPlays.includes(n)) modelVariables[n]["cash"] = '1';
             if(gppPlays.includes(n)) modelVariables[n]["gpp"] = '1';
-
+            if(p.proj < minProjection){
+                modelVariables[n]["dart"] = '1';
+            }
         }
         
 
     }
-
+    console.log(modelVariables);
     // convert CPT proj to 1.5x flex proj
     for(let k of Object.keys(modelVariables)){
         if(k.includes("CPT")){
+            console.log(k);
             let n = k.replace("CPT ", "").trim();
             modelVariables[k]["proj"] = Number(modelVariables[n]["proj"]) * 1.5;
             modelVariables[k]["salary"] = Number(modelVariables[n]["salary"]) * 1.5;
@@ -1498,7 +1509,8 @@ function optimizeShowdown(players){
                 "i": {"equal": 6},
                 "CPT": {"equal": 1},
                 "cash": {"min": minCash},
-                "gpp": {"min": minGPP}
+                "gpp": {"min": minGPP},
+                "dart": {"max": maxDarts}
             },  
             "variables": modelVariables,
             "ints": {}
@@ -3148,4 +3160,77 @@ function filterCashOrGpp(){
             r.style.display = "";
         }
     }
+}
+
+// Fill matchups table with Team / Slider / Opponent so we can weight projections based on alternate matchup expectations
+function fillMatchupsTable(){
+    var matchupsTable = document.getElementById("matchupsTable");
+    var players = document.getElementById("contestDataTable").rows;
+    var teams = [];
+    var opponents = [];
+    for(let p of players){
+        if(p.rowIndex == 0 || teams.includes(p.cells[3].innerHTML.trim())) continue;
+        teams.push(p.cells[3].innerHTML.trim());
+        opponents.push(p.cells[4].innerHTML.trim());
+    }
+
+    for(let i = 0; i < teams.length; i++){
+        var row = matchupsTable.insertRow(-1);
+        var cell = row.insertCell(-1);
+        cell.innerHTML = teams[i];
+        cell = row.insertCell(-1);
+        cell.innerHTML = '<text style="width:100px">0</text><input type="range" style="width:300px" min="-100" max="100" value="0" step="5" class="matchupSlider" oninput="updateProjectionsByMatchup(this)"><text style="width:100px">0</text>';
+        cell.style.width = "500px";
+        cell = row.insertCell(-1);
+        cell.innerHTML = opponents[i];
+    }
+
+    if(localStorage.matchupsTableData){
+        var data = JSON.parse(localStorage.matchupsTableData);
+        for(let r of matchupsTable.rows){
+            if(r.rowIndex == 0) continue;
+            r.cells[1].children[1].value = data[r.cells[0].innerHTML]["slider"];
+            r.cells[1].children[0].innerHTML = data[r.cells[0].innerHTML]["slider"];
+            r.cells[1].children[2].innerHTML = -data[r.cells[0].innerHTML]["slider"];
+            r.cells[2].innerHTML = data[r.cells[0].innerHTML]["opponent"];
+        }
+    }
+}
+
+// Update projections by matchup
+function updateProjectionsByMatchup(slider){
+    var matchupsTable = document.getElementById("matchupsTable");
+
+    var data = {};
+    for(let r of matchupsTable.rows){
+        if(r.rowIndex == 0) continue;
+        data[r.cells[0].innerHTML] = {"slider":r.cells[1].children[1].value, "opponent":r.cells[2].innerHTML};
+    }
+    localStorage.matchupsTableData = JSON.stringify(data);
+
+    var leftText = slider.previousElementSibling;
+    var rightText = slider.nextElementSibling;
+    leftText.innerHTML = slider.value;
+    rightText.innerHTML = -slider.value;
+}
+
+// Apply matchup adjustments to projections
+function applyMatchupAdjustments(){
+    var data = JSON.parse(localStorage.matchupsTableData);
+    var players = document.getElementById("contestDataTable").rows;
+    for(let p of players){
+        if(p.rowIndex == 0) continue;
+        if(p.cells[2].getAttribute("defense") == "true"){
+            console.log("defense: " + p.cells[1].innerHTML + " || value: " + data[p.cells[4].innerHTML]["slider"]);
+            p.cells[9].innerHTML = (p.cells[9].innerHTML * (100-Number(data[p.cells[4].innerHTML]["slider"]))/100).toFixed(1);
+        }else{
+            p.cells[9].innerHTML = (p.cells[9].innerHTML * (100+Number(data[p.cells[3].innerHTML]["slider"]))/100).toFixed(1);
+        }
+    }
+}
+
+// Reset matchups to default values
+function clearMatchups(){
+    localStorage.matchupsTableData = JSON.stringify({});
+    location.reload();
 }

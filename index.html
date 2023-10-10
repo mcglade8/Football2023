@@ -25,6 +25,7 @@
             <button id="injuriesInfo" class="tabButton">Injuries</button>
             <button id="stealInfo" class="tabButton">Steal Usage</button>
             <button id="cashOrGppInfo" class="tabButton">Cash or GPP</button> 
+            <button id="matchupsInfo" class="tabButton">Matchups</button>
         </div>
         <div id="contest" class="contestDiv tabContent" style="display:block;width:100%">
             <div class="sectionHeader">
@@ -228,8 +229,8 @@
                 <br><text class="classicBuilder">Min stack (not including QB): </text><input class="classicBuilder" type="number" id="minStack" value="1" min="0" max="4">
                 <br><text class="classicBuilder">Max stack (not including QB): </text><input class="classicBuilder" type="number" id="maxStack" value="2" min="0" max="4">
                 <br><text class="classicBuilder">Salary range: </text><input class="classicBuilder" type="number" id="minSalaryClassic" value="49000" min="0" max="49900"><input class="classicBuilder" type="number" id="maxSalaryClassic" value="50000" min="0" max="50000">
-                <br><text class="classicBuilder">Ownership range: </text><input class="classicBuilder" type="number" id="minOwnershipClassic" value="80" min="0"><input class="classicBuilder" type="number" id="maxOwnershipClassic" value="115" min="0">
-                <br><text class="classicBuilder">Min projection: </text><input class="classicBuilder" type="number" id="minProjection" value="5" min="0">
+                <br><text class="classicBuilder">Ownership range: </text><input class="classicBuilder" type="number" id="minOwnershipClassic" value="80" min="0"><text class="classicBuilder">-</text><input class="classicBuilder" type="number" id="maxOwnershipClassic" value="115" min="0">
+                <br>Max <input type="number" id="maxDarts" value="1" min="0"> below projection: <input type="number" id="minProjection" value="5" min="0">
                 
                 <!-- Have user upload .csv of contest info they want to build for -->
                 <div class="csvSection">
@@ -489,7 +490,26 @@
                 <tbody>
                     
                 </tbody>
+            </table>
         </div>
+        <div id="matchups" class="tabContent" style="display:none">
+            <div class="sectionHeader">
+                <h2>Matchups</h2>
+                <h4>Weight matchups toward an offense or defense</h4>
+            </div>  
+            <button onclick="reloadPage()">Reload and apply</button><button onclick="clearMatchups()">Clear</button>
+            <table id="matchupsTable" class="tablesorter">
+                <thead>
+                    <th>Offense</th>
+                    <th>Weight</th>
+                    <th>Defense</th>
+                </thead>
+                <tbody>
+                    
+                </tbody>
+            </table>
+        </div>
+
     </div>
     <script type="text/javascript" src="nflscript.js"></script>
 </body>
