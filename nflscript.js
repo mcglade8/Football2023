@@ -2953,6 +2953,20 @@ function adjustProjectionsByInjuries(){
 
 // Add injury benefit to player projections
 function addInjuryBenefit(playerProjections, bProjections, bPct){
+    if(bProjections == undefined || bProjections == null || bProjections == ""){
+        newProj = {
+            "Passing Yards": (Number(playerProjections["Passing Yards"]) * Number(bPct)/100).toFixed(1),
+            "Passing TDs": (Number(playerProjections["Passing TDs"]) * Number(bPct)/100).toFixed(1),
+            "Interceptions": (Number(playerProjections["Interceptions"]) * Number(bPct)/100).toFixed(1),
+            "Rushing Yards": (Number(playerProjections["Rushing Yards"]) * Number(bPct)/100).toFixed(1),
+            "Rushing TDs": (Number(playerProjections["Rushing TDs"]) * Number(bPct)/100).toFixed(1),
+            "Receptions": (Number(playerProjections["Receptions"]) * Number(bPct)/100).toFixed(1),
+            "Receiving Yards": (Number(playerProjections["Receiving Yards"]) * Number(bPct)/100).toFixed(1),
+            "Receiving TDs": (Number(playerProjections["Receiving TDs"]) * Number(bPct)/100).toFixed(1)
+        };
+        return newProj;
+        }
+
     var newProj = {};
     newProj["Passing Yards"] = (Number(bProjections["Passing Yards"]) + Number(playerProjections["Passing Yards"]) * Number(bPct)/100).toFixed(1);
     newProj["Passing TDs"] = (Number(bProjections["Passing TDs"]) + Number(playerProjections["Passing TDs"]) * Number(bPct)/100).toFixed(1);
@@ -3406,9 +3420,13 @@ async function applyMatchupAdjustments(){
         for(let p of players){
             if(p.rowIndex == 0) continue;
             if(p.cells[2].getAttribute("defense") == "true"){
-                p.cells[9].innerHTML = (p.cells[9].innerHTML * (100-Number(data[p.cells[4].innerHTML]["slider"]))/100).toFixed(1);
+                if(!p.cells[4].innerHTML in data) continue; else{
+                    p.cells[9].innerHTML = (p.cells[9].innerHTML * (100-Number(data[p.cells[4].innerHTML]["slider"]))/100).toFixed(1);
+                }
             }else{
-                p.cells[9].innerHTML = (p.cells[9].innerHTML * (100+Number(data[p.cells[3].innerHTML]["slider"]))/100).toFixed(1);
+                if(!p.cells[3].innerHTML in data) continue; else{
+                    p.cells[9].innerHTML = (p.cells[9].innerHTML * (100+Number(data[p.cells[3].innerHTML]["slider"]))/100).toFixed(1);
+                }
             }
         }
         resolve();
