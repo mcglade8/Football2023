@@ -26,6 +26,7 @@
             <button id="stealInfo" class="tabButton">Steal Usage</button>
             <button id="cashOrGppInfo" class="tabButton">Cash or GPP</button> 
             <button id="matchupsInfo" class="tabButton">Matchups</button>
+            <button id="otherGroupsInfo" class="tabButton">Other Groups</button>
         </div>
         <div id="contest" class="contestDiv tabContent" style="display:block;width:100%">
             <div class="sectionHeader">
@@ -224,9 +225,9 @@
             <div id="builderControl" class="sectionHeader">
                 Lineups to build: <input type="number" id="lineupsToBuild" value="20" min="1">
                 <button class="buildLineups classicBuilder" onclick="buildLineups()">Build Lineups</button><button class="buildLineups showdownBuilder" onclick="buildShowdownLineups()" style="display:none">Build Lineups</button><button onclick="clearLineups()">Clear Lineups</button>
-                <br><text>Min cash plays: </text><input type="number" id="minCash" value="3" min="0">
-                <br><text>Min GPP plays: </text><input type="number" id="minGpp" value="3" min="0">
-                <br><text class="classicBuilder">Min stack (not including QB): </text><input class="classicBuilder" type="number" id="minStack" value="1" min="0" max="4">
+                <br><text>Min cash plays: </text><input type="number" id="minCash" value="9" min="0">
+                <br><text>Min GPP plays: </text><input type="number" id="minGpp" value="0" min="0">
+                <br><text class="classicBuilder">Min stack (not including QB): </text><input class="classicBuilder" type="number" id="minStack" value="2" min="0" max="4">
                 <br><text class="classicBuilder">Max stack (not including QB): </text><input class="classicBuilder" type="number" id="maxStack" value="2" min="0" max="4">
                 <div class="showdownBuilder">Limit CPT
                     <br><label for="neither" style="width:150px">No limit</label><input type="radio"  name="cptRequire" id="neither" value="neither">
@@ -235,8 +236,9 @@
                     <br><label for="both" style="width:150px">Cash and GPP</label><input type="radio"  name="cptRequire" id="both" value="both" checked>
                 </div>
                 <br><text>Salary range: </text><input type="number" id="minSalaryShowdown" class="showdownBuilder" value="45000" min="0" max="49900" step="100"><input type="number" id="minSalaryClassic" class="classicBuilder" value="49000" min="0" max="49900" step="100">-<input type="number" id="maxSalaryClassic" value="50000" min="0" max="50000" step="100">
-                <br><text class="classicBuilder">Ownership range: </text><input class="classicBuilder" type="number" id="minOwnershipClassic" value="80" min="0"><text class="classicBuilder">-</text><input class="classicBuilder" type="number" id="maxOwnershipClassic" value="115" min="0">
-                <br>Max <input type="number" id="maxDarts" value="1" min="0"> below projection: <input type="number" id="minProjection" value="5" min="0">
+                <br><text class="classicBuilder">Ownership range: </text><input class="classicBuilder" type="number" id="minOwnershipClassic" value="0" min="0"><text class="classicBuilder">-</text><input class="classicBuilder" type="number" id="maxOwnershipClassic" value="200" min="0">
+                <br>Max <input type="number" id="maxDarts" value="1" min="0"> below projection: <input type="number" id="minProjection" value="7" min="0">
+                <br>Group min: <input type="number" id="groupMin" value="3" min="0"> max: <input type="number" id="groupMax" value="5" min="0">
                 
                 <!-- Have user upload .csv of contest info they want to build for -->
                 <div class="csvSection">
@@ -482,6 +484,10 @@
                 <option value="CPT">CPT</option>
                 <option value="FLEX">FLEX</option>
             </select>
+            <select id="contestSelectCashOrGpp" onchange="filterCashOrGpp()">
+                <option value="All slates">All slates</option>
+            </select>
+            Num Cash: <text id="numCashInTable">0</text> | Num GPP: <text id="numGppInTable">0</text>
             <table id="cashOrGppTable" class="tablesorter">
                 <thead>
                     <th>Player</th>
@@ -515,6 +521,18 @@
                     
                 </tbody>
             </table>
+        </div>
+        <div id="otherGroups" class="tabContent" style="display:none">
+            <div class="sectionHeader">
+                <h2>Other Groups</h2>
+                <h4>Group players together to suggest correlations</h4>
+                <h4>First player listed is the "key" player, with the rest of the group dependent on his presence</h4>
+                <h4>All lineups must have at least 1 key player, unless min group is set to 0 in the builder.</h4>
+            </div>
+            <button onclick="clearGroups()">Clear</button><button onclick="addGroup()">Add Group</button>
+            <div id="allGroups">
+
+            </div>
         </div>
 
     </div>

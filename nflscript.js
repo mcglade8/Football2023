@@ -124,6 +124,7 @@ function addTableRows(contestData, contestName, contestDate){
     }
     clearOldData();
     saveTableData();
+    
     location.reload();
 }
 
@@ -148,6 +149,9 @@ $(function() {
     fillCashOrGppTeam();
     fillMatchupsTable();
     applyMatchupAdjustments();
+    getGroupsFromStorage();
+    loadInputs(document.getElementById("builder"));
+    loadInputs(document.getElementById("setPlayerMedians"));
 });
 
 // Add ownership projections for classic based on proj/salary (lm from R per position)
@@ -362,6 +366,7 @@ function saveTableData(){
 // Clear old data from contestDataTable
 function clearSaves(){
     localStorage.removeItem("tableData");
+    
     location.reload();
 }
 
@@ -408,6 +413,8 @@ function loadTableData(){
         }
     }
     document.getElementById('select2').innerHTML = document.getElementById('select').innerHTML;
+    document.getElementById('contestSelectCashOrGpp').innerHTML = document.getElementById('select').innerHTML;
+
     fillPlayerData();
 }
 
@@ -1407,6 +1414,10 @@ function pickBuilder(section){
         for(let c of showdownBuilder){
             c.style.display = "none";
         }
+        document.getElementById("minCash").value = 9;
+        document.getElementById("minGpp").value = 0;
+        document.getElementById("groupMin").value = 0;
+        document.getElementById("groupMax").value = 0;
     } else{
         for(let c of classicBuilder){
             c.style.display = "none";
@@ -1414,6 +1425,10 @@ function pickBuilder(section){
         for(let c of showdownBuilder){
             c.style.display = "";
         }
+        document.getElementById("minCash").value = 6;
+        document.getElementById("minGpp").value = 2;
+        document.getElementById("groupMin").value = 3;
+        document.getElementById("groupMax").value = 5;
     }
 
 }
@@ -1706,16 +1721,61 @@ function optimizeShowdown(players){
             thisLineup.push(cpt);
             //thisLineup = JSON.stringify(thisLineup);
             var flipLineup = thisLineup;
-
+            //Check if lineup abides by a group rule
+            var groupOk = checkForGroup(thisLineup);
             flipLineup[5] = flipLineup[5].replace("CPT ", "");
             var builtLineups = getBuiltShowdownLineups();
             for(let l of builtLineups){
                 if(JSON.stringify(l) == JSON.stringify(flipLineup)) alreadyBuilt = true;
             }
-            if(!alreadyBuilt && thisLineup.length == 6) setTimeout(addLineupShowdown(thisLineup, modelVariables), 100); else(optimizeShowdown(generateProjections()));
+            if(!alreadyBuilt && thisLineup.length == 6 && groupOk) setTimeout(addLineupShowdown(thisLineup, modelVariables), 100); else(optimizeShowdown(generateProjections()));
         }
     });
 }
+
+// Check if lineup abides by a group rule
+function checkForGroup(lineup){
+    var groups = JSON.parse(localStorage.getItem("groups"));
+    if(groups == null) return true;
+    var groupMin = Number(document.getElementById("groupMin").value);
+    if(groupMin == 0) return true;
+    var groupMax = Number(document.getElementById("groupMax").value);
+    for(let group of groups){
+        var g = group["players"];
+        if(!lineup.includes(g[0])) continue; // if lineup doesn't include first player in group, skip to next group
+        var groupCount = 0;
+        for(let p = 0; p < lineup.length; p++){
+            if(g.includes(lineup[p])) groupCount++;
+        }
+        if(groupCount >= groupMin && groupCount <= groupMax) return true;
+    }
+    return false;
+}
+
+// Save last inputs for lineup builder
+function saveInputs(section){
+    var inputs = section.getElementsByTagName("input");
+    for(let i of inputs){
+        if(i.type == "number" || i.type == "range") localStorage.setItem(i.id, i.value);
+        if(i.type == "radio") localStorage.setItem(i.id, i.checked);
+    }
+}
+
+for(let i of document.getElementById("builder").getElementsByTagName("input")){
+    if(i.getAttribute("onchange") == null) i.setAttribute('onchange', 'saveInputs(document.getElementById("builder"))');
+}
+
+// Load last inputs for lineup builder
+function loadInputs(section){
+    var inputs = section.getElementsByTagName("input");
+    for(let i of inputs){
+        if(localStorage.getItem(i.id) != null){
+            if(i.type in ["number", "range"]) i.value = localStorage.getItem(i.id);
+            if(i.type == "radio" && localStorage.getItem(i.id) != undefined) i.setAttribute("checked", "");
+        }
+    }
+}
+
 
 
 
@@ -2074,7 +2134,8 @@ function updateProjectionSlider(id){
     var slider = document.getElementById(id);
     var label = slider.previousElementSibling;
     label.innerHTML = slider.value;
-    populateSumOfLabels()
+    populateSumOfLabels();
+    saveInputs(document.getElementById("playerMedians"));
 }
 
 function filterTeamsMedians(){
@@ -2982,6 +3043,7 @@ function addInjuryBenefit(playerProjections, bProjections, bPct){
 
 // Reload page so that injury updates can take effect
 function reloadPage(){
+    
     location.reload();
 }
 
@@ -3222,6 +3284,7 @@ function updateFromSteal(playerProjections, oldProj, newProj){
 // Clear injuries table
 function clearSteal(){
     localStorage.stolen = JSON.stringify([]);
+    
     location.reload();
 }
 
@@ -3287,6 +3350,7 @@ function fillCashOrGpp(){
 
 // Toggle cash designation for player
 function toggleCash(btn){
+    var numCash = document.getElementById("numCashInTable");
     var player = btn.parentNode.parentNode.cells[0].innerHTML;
     var cashPlays = [];
     if(localStorage.cashPlays) cashPlays = JSON.parse(localStorage.cashPlays);
@@ -3294,16 +3358,19 @@ function toggleCash(btn){
         btn.setAttribute("selected", "false");
         btn.innerHTML = "Cash";
         cashPlays.splice(cashPlays.indexOf(player), 1);
+        numCash.innerHTML = Number(numCash.innerHTML) - 1;
     } else{
         btn.setAttribute("selected", "true");
         btn.innerHTML = "Cash";
         cashPlays.push(player);
+        numCash.innerHTML = Number(numCash.innerHTML) + 1;
     }
     localStorage.cashPlays = JSON.stringify(cashPlays);
 }
 
 // Toggle GPP designation for player
 function toggleGpp(btn){
+    var numGpp = document.getElementById("numGppInTable");
     var player = btn.parentNode.parentNode.cells[0].innerHTML;
     var gppPlays = [];
     if(localStorage.gppPlays) gppPlays = JSON.parse(localStorage.gppPlays);
@@ -3311,10 +3378,12 @@ function toggleGpp(btn){
         btn.setAttribute("selected", "false");
         btn.innerHTML = "GPP";
         gppPlays.splice(gppPlays.indexOf(player), 1);
+        numGpp.innerHTML = Number(numGpp.innerHTML) - 1;
     } else{
         btn.setAttribute("selected", "true");
         btn.innerHTML = "GPP";
         gppPlays.push(player);
+        numGpp.innerHTML = Number(numGpp.innerHTML) + 1;
     }
     localStorage.gppPlays = JSON.stringify(gppPlays);
 }
@@ -3322,6 +3391,7 @@ function toggleGpp(btn){
 function clearCashOrGpp(){
     localStorage.cashPlays = JSON.stringify([]);
     localStorage.gppPlays = JSON.stringify([]);
+    
     location.reload();
 }
 
@@ -3342,21 +3412,50 @@ function fillCashOrGppTeam(){
 }
 
 // Filter cashOrGpp table by selections
-function filterCashOrGpp(){
-    var teamSelect = document.getElementById('cashOrGppTeam').value;
-    var posSelect= document.getElementById('cashOrGppPosition').value;
-    var table = document.getElementById("cashOrGppTable");
-    var rows = table.rows;
-    for(let r of rows){
-        if(r.rowIndex == 0) continue;
-        if(teamSelect != "All" && r.cells[2].innerHTML != teamSelect){
-            r.style.display = "none";
-        }else if(posSelect != "All" && r.cells[1].innerHTML != posSelect){
-            r.style.display = "none";
-        }else{
-            r.style.display = "";
+async function filterCashOrGpp(){
+    let promise = new Promise(function(resolve) {
+        var contestSelect = document.getElementById('contestSelectCashOrGpp').value;
+        var contestTable = document.getElementById("contestDataTable");
+        var contestRows = contestTable.rows;
+        var inContest = [];
+        for(let r of contestRows){
+            if(r.rowIndex == 0) continue;
+            if(r.cells[8].innerHTML == contestSelect){
+                inContest.push(r.cells[1].innerHTML);
+            }
         }
-    }
+        resolve([inContest, contestSelect]);
+    });
+    promise.then((data) =>{
+        var inContest = data[0];
+        var contestSelect = data[1];
+        var teamSelect = document.getElementById('cashOrGppTeam').value;
+        var posSelect= document.getElementById('cashOrGppPosition').value;
+        var table = document.getElementById("cashOrGppTable");
+        var rows = table.rows;
+        var numCash = 0;
+        var numGpp = 0;
+        for(let r of rows){
+            if(r.rowIndex == 0) continue;
+            if(teamSelect != "All" && r.cells[2].innerHTML != teamSelect){
+                r.style.display = "none";
+            }else if(posSelect != "All" && r.cells[1].innerHTML != posSelect){
+                r.style.display = "none";
+            }else if(contestSelect != "All slates" && !inContest.includes(r.cells[0].innerHTML)){
+                r.style.display = "none";
+            }else{
+                r.style.display = "";
+            }
+            if(r.cells[7].getElementsByTagName('button')[0].getAttribute("selected") == "true" && r.style.display != "none"){
+                numCash++;
+            }
+            if(r.cells[8].getElementsByTagName('button')[0].getAttribute("selected") == "true" && r.style.display != "none"){
+                numGpp++;
+            }
+        }
+        document.getElementById("numCashInTable").innerHTML = numCash;
+        document.getElementById("numGppInTable").innerHTML = numGpp;
+    });
 }
 
 // Fill matchups table with Team / Slider / Opponent so we can weight projections based on alternate matchup expectations
@@ -3442,5 +3541,71 @@ async function applyMatchupAdjustments(){
 // Reset matchups to default values
 function clearMatchups(){
     localStorage.matchupsTableData = JSON.stringify({});
+    
     location.reload();
+}
+
+// Add a div to the Other Groups section to allow for grouping of players
+// Within the div, be able to add and remove players from the group
+function addGroup(){
+    var newGroup = document.createElement("div");
+    newGroup.setAttribute("class", "playerGroup");
+    var groupID = document.getElementById("allGroups").children.length;
+    newGroup.setAttribute("id", "group"+groupID);
+    newGroup.innerHTML = "<button onclick='addGroupPlayer("+groupID+")'>Add Player</button><table id='group"+groupID+"Table'></table>";
+    document.getElementById("allGroups").appendChild(newGroup);
+}
+
+// Add a player to a group
+function addGroupPlayer(id){
+    var table = document.getElementById("group"+id+"Table");
+    var row = table.insertRow(-1);
+    var cell = row.insertCell(-1);
+    cell.innerHTML = '<input list="playersList" class="groupPlayer" onchange="updateGroupTable()">';
+    cell = row.insertCell(-1);
+    cell.innerHTML = '<button onclick="removeRow(this)">Remove</button>';
+}
+
+function updateGroupTable(){
+    var groups = document.getElementsByClassName("playerGroup");
+    var groupData = [];
+    for(let g of groups){
+        var group = {};
+        group.players = [];
+        var players = g.getElementsByClassName("groupPlayer");
+        for(let p of players){
+            group.players.push(p.value);
+        }
+        groupData.push(group);
+    }
+    localStorage.groups = JSON.stringify(groupData);
+
+}
+
+// Clear groups
+function clearGroups(){
+    localStorage.groups = JSON.stringify([]);
+    
+    location.reload();
+}
+
+// Get groups from storage
+function getGroupsFromStorage(){
+    var groups = JSON.parse(localStorage.groups);
+    for(let g of groups){
+        var newGroup = document.createElement("div");
+        newGroup.setAttribute("class", "playerGroup");
+        var groupID = document.getElementById("allGroups").children.length;
+        newGroup.setAttribute("id", "group"+groupID);
+        newGroup.innerHTML = "<button onclick='addGroupPlayer("+groupID+")'>Add Player</button><table id='group"+groupID+"Table'></table>";
+        document.getElementById("allGroups").appendChild(newGroup);
+        var table = document.getElementById("group"+groupID+"Table");
+        for(let p of g.players){
+            var row = table.insertRow(-1);
+            var cell = row.insertCell(-1);
+            cell.innerHTML = '<input list="playersList" class="groupPlayer" onchange="updateGroupTable()" value="'+p+'">';
+            cell = row.insertCell(-1);
+            cell.innerHTML = '<button onclick="removeRow(this)">Remove</button>';
+        }
+    }
 }
