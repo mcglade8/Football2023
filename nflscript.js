@@ -1210,7 +1210,7 @@ function optimizeClassic(players){
                 "QB": {"equal": 1},
                 "RB": {"min": 2},
                 "WR": {"min": 3},
-                "TE": {"equal": 1},
+                "TE": {"min": 1},
                 "FLEX": {"equal": 7},
                 "DST": {"equal": 1},
                 "i": {"equal": 9},
