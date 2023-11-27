@@ -10,6 +10,7 @@ async function getContestData(DKSalaries){
     var contestDate = document.getElementById("contestDate").value;
     var contestName = document.getElementById("contestName").value;
     for(let i of DKSalaries){
+        if('Game' in i) if(i['Game'] != undefined) contestData.push(i);
         if('Game Info' in i) if(i['Game Info'] != undefined) contestData.push(i);
     }
     addSelectOption(contestName, contestDate);
@@ -92,6 +93,16 @@ function addTableRows(contestData, contestName, contestDate){
     }
     for(let p of contestData){
         // If player is already in table, skip it. Otherwise add to playersInList
+        if('Id' in p){ 
+            p['ID'] = p['Id'];
+            p['Name'] = p['Nickname'];
+            p['Game Info'] = p['Game'];
+            p['TeamAbbrev'] = p['Team'];
+            if(p['Team'] == 'JAC') {
+                p['TeamAbbrev'] = 'JAX';
+                p['Game Info'].replace("JAC", "JAX");
+            }
+        }
         if(!ids.includes(p['ID'])) {
             ids.push(p['ID'].trim());
             var row = table.insertRow(-1);
@@ -112,9 +123,9 @@ function addTableRows(contestData, contestName, contestDate){
                 if(p['Position'] == 'WR') row.cells[2].setAttribute("pos", "wr");
                 if(p['Position'] == 'TE') row.cells[2].setAttribute("pos", "te");
 
-            } else row.insertCell(2).innerHTML = p['Position'].trim();
+            } else row.insertCell(2).innerHTML = p['Position'].replace("D", "DST").trim();
             row.insertCell(3).innerHTML = p['TeamAbbrev'].trim();
-            row.insertCell(4).innerHTML = p['Game Info'].split(" ")[0].replace("@" , "").replace(p['TeamAbbrev'], "").trim();
+            row.insertCell(4).innerHTML = p['Game Info'].replace("JAC", "JAX").split(" ")[0].replace("@" , "").replace(p['TeamAbbrev'], "").trim();
             row.insertCell(5).innerHTML = p['Salary'].trim();
             row.insertCell(6).innerHTML = p['ID'].trim();
             row.insertCell(7).innerHTML = 0;
@@ -823,7 +834,7 @@ function populateTeamInfo(){
                 }else if((r.cells[2].innerHTML == "TE"  || (r.cells[2].innerHTML == "FLEX" && r.cells[2].getAttribute("pos") == "te"))&& !wasAssigned.TE && r.cells[3].innerHTML == t){
                     teamObject.TE =  {player: r.cells[1].innerHTML, proj: r.cells[9].innerHTML, salary: r.cells[5].innerHTML};
                     wasAssigned.TE = true;
-                }else if((r.cells[2].innerHTML == "DST"  || (r.cells[2].innerHTML == "FLEX" && r.cells[2].getAttribute("defense") == "true"))&& !wasAssigned.DST && r.cells[3].innerHTML == t){
+                }else if((r.cells[2].innerHTML == "DST"  || r.cells[2].innerHTML == "D" || (r.cells[2].innerHTML == "FLEX" && r.cells[2].getAttribute("defense") == "true"))&& !wasAssigned.DST && r.cells[3].innerHTML == t){
                     teamObject.DST =  {player: r.cells[1].innerHTML, proj: r.cells[9].innerHTML, salary: r.cells[5].innerHTML};
                     wasAssigned.DST = true;
                 }
@@ -1419,16 +1430,27 @@ function pickBuilder(section){
         document.getElementById("groupMin").value = 0;
         document.getElementById("groupMax").value = 0;
     } else{
+            
         for(let c of classicBuilder){
             c.style.display = "none";
         }
         for(let c of showdownBuilder){
             c.style.display = "";
         }
-        document.getElementById("minCash").value = 6;
-        document.getElementById("minGpp").value = 2;
-        document.getElementById("groupMin").value = 3;
-        document.getElementById("groupMax").value = 5;
+        if(section == "FDShowdown"){
+            document.getElementById("Showdown").style.display = "none";
+            document.getElementById("minCash").value = 5;
+            document.getElementById("minGpp").value = 0;
+            document.getElementById("groupMin").value = 0;
+            document.getElementById("groupMax").value = 4;
+
+        }else { 
+            document.getElementById("FDShowdown").style.display = "";
+            document.getElementById("minCash").value = 6;
+            document.getElementById("minGpp").value = 2;
+            document.getElementById("groupMin").value = 3;
+            document.getElementById("groupMax").value = 5;
+        }
     }
 
 }
@@ -1440,7 +1462,7 @@ function buildShowdownLineups(){
     if(contestTime == "All slates") alert("Please select a slate"); else{
         localStorage.notFeasible = 0;
         for(let i = 0; i < lineupsToBuild; i++){
-            optimizeShowdown(generateProjections());
+            if(document.querySelector("#FDShowdownLineupTable > thead > tr > th:nth-child(1)").innerHTML == "MVP") optimizeFDShowdown(generateProjections()); else optimizeShowdown(generateProjections());
         }   
     }
 }
@@ -1733,6 +1755,126 @@ function optimizeShowdown(players){
     });
 }
 
+// Solve a FanDuel showdown lineup for a given contest start time
+async function optimizeFDShowdown(players){
+    //setTimeout(function(){return;}, 1000);
+    var modelVariables = {};
+    var teams = [];
+    var minCash = Number(document.getElementById("minCash").value);
+    var minGPP = Number(document.getElementById("minGpp").value);
+    var maxDarts = Number(document.getElementById("maxDarts").value);
+    var minProjection = Number(document.getElementById("minProjection").value);
+    var minSalary = Number(document.getElementById("minSalaryShowdown").value);
+    var salaryCap = Number(document.getElementById("maxSalaryClassic").value);
+    var cashPlays = [];
+    var gppPlays = [];
+    if(localStorage.cashPlays != undefined) cashPlays = JSON.parse(localStorage.cashPlays);
+    if(localStorage.gppPlays != undefined) gppPlays = JSON.parse(localStorage.gppPlays);
+
+    for(let p of players){
+        //if(p.proj <= 0) continue;
+        let n = p.name;
+        let t = p.team;
+        if(!teams.includes(t)) teams.push(t);
+                
+       
+        modelVariables[n] = {"proj": p.proj, "salary": p.salary, "i": '1'};
+        modelVariables[n][t] = '1';
+        if(cashPlays.includes(n)) modelVariables[n]["cash"] = '1';
+        if(gppPlays.includes(n)) modelVariables[n]["gpp"] = '1';
+        if(p.oldProj < minProjection){
+            modelVariables[n]["dart"] = '1';
+        }
+    }
+
+    var results;
+    require(['solver'], function(solver) {
+        
+        var model = {
+            "optimize": "proj",
+            "opType": "max",
+            "constraints": {
+                "salary": {"max": salaryCap, "min": minSalary},
+                "i": {"equal": 5},
+                "cash": {"min": minCash},
+                "gpp": {"min": minGPP},
+                "dart": {"max": maxDarts}
+            },  
+            "variables": modelVariables,
+            "binaries": {}
+        };
+        for(let k of Object.keys(modelVariables)){
+            model.constraints[k] = {"max": '1'};
+            model.binaries[k] = '1';
+        }
+        for(let t of teams){
+            model.constraints[t] = {"max": '4'};
+        }
+
+        results = solver.Solve(model);
+        // make sure it's not already in our lineups
+        if(!results.feasible) {
+            if(localStorage.notFeasible){ 
+                let notFeasible = Number(localStorage.notFeasible);
+                notFeasible++;
+                localStorage.setItem('notFeasible', notFeasible); 
+            }else localStorage.notFeasible = 1;
+            if(Number(localStorage.notFeasible) > 10) {
+                console.log("No more lineups available");
+                return;
+            } else optimizeFDShowdown(generateProjections());
+        } else {
+            let promise = new Promise(function(resolve) {
+                var thisLineup = [];
+                console.log(results);
+                for(let k of Object.keys(results)){
+                    if(k != "feasible" && k != "result" && k != "bounded" && k != "iterations" && k != "time" && k != "dual" && k != "primal" && k != "isIntegral"){
+                        thisLineup.push(k);
+                    }
+                }
+                resolve(thisLineup);
+            });
+            promise.then((thisLineup) => {
+
+                return sortByProj(thisLineup, players);
+            }).then((sorted) => {
+                var alreadyBuilt = false;
+                var groupOk = checkForGroup(sorted);
+                var builtLineups = getBuiltFDShowdownLineups();
+                for(let l of builtLineups){
+                    if(JSON.stringify(l) == JSON.stringify(sorted)) alreadyBuilt = true;
+                }
+                if(!alreadyBuilt && sorted.length == 5 && groupOk) setTimeout(addLineupFDShowdown(sorted, players), 100); else(optimizeFDShowdown(generateProjections()));
+            });
+        }
+    });
+}
+
+// Sort array by projection used for FD Showdown
+async function sortByProj(lineup, players){
+    // set "name" as key for players object
+    let promise = new Promise(function(resolve) {
+        var fixPlayers = {};
+        for(let p of players){
+            fixPlayers[p.name] = p;
+        }
+        resolve(fixPlayers);
+    });
+    // order lineup by projection
+    return promise.then((fixPlayers) => {
+        var orderedLineup = [];
+        for(let p of lineup){
+            orderedLineup.push(fixPlayers[p]);
+        }
+        orderedLineup.sort(function(a, b){return b.proj - a.proj});
+        var newLineup = [];
+        for(let p of orderedLineup){
+            newLineup.push(p.name);
+        }
+        return newLineup;
+    });
+}
+
 // Check if lineup abides by a group rule
 function checkForGroup(lineup){
     var groups = JSON.parse(localStorage.getItem("groups"));
@@ -1800,12 +1942,19 @@ function sortArray(arr){
 function clearLineups(){
     var lineupTable = document.getElementById("lineupTable");
     var showdownLineupTable = document.getElementById("showdownLineupTable");
+    var FDShowdownLineupTable = document.getElementById("FDShowdownLineupTable");
     while(lineupTable.rows.length > 1){
         lineupTable.deleteRow(-1);
     }
     while(showdownLineupTable.rows.length > 1){
         showdownLineupTable.deleteRow(-1);
     }
+    while(FDShowdownLineupTable.rows.length > 1){
+        FDShowdownLineupTable.deleteRow(-1);
+    }
+    document.getElementById("lineupsBuilt").innerHTML = 0;
+    document.getElementById("showdownLineupsBuilt").innerHTML = 0;
+    document.getElementById("FDShowdownLineupsBuilt").innerHTML = 0;
 }
 
 // Remove duplicates from array
@@ -1831,6 +1980,21 @@ function getBuiltShowdownLineups(){
         lineup = sortArray(lineup);
         let cpt = r.cells[0].innerHTML.split("<br>")[0];
         lineup.push(cpt);
+        lineups.push(lineup);
+    }
+    return lineups;
+}
+
+// Get lineups that have already been built from showdownLineupTable and return an array of names, sorted alphabetically, with CPT at the end
+function getBuiltFDShowdownLineups(){
+    var lineups = [];
+    var rows = document.getElementById("FDShowdownLineupTable").rows;
+    for(let r of rows){
+        var lineup = [];
+        for(let i = 0; i < 5; i++){
+            let name = r.cells[i].innerHTML.split("<br>")[0];
+            lineup.push(name);
+        }
         lineups.push(lineup);
     }
     return lineups;
@@ -1880,6 +2044,44 @@ function addLineupShowdown(lineup,players){
     updateShowdownOwnership();
 }
 
+function addLineupFDShowdown(lineup,players){
+    for(let p of players){
+        players[p.name] = p;
+    }
+    //setTimeout(function(){return;}, 1000);
+
+    var lineupTable = document.getElementById("FDShowdownLineupTable");
+    var row = lineupTable.insertRow(-1);
+    
+    var orderedLineup = [];
+    
+    for(let i = 0; i< lineup.length; i++){
+        orderedLineup.push(players[lineup[i]]);
+    }
+
+    let totalProj = 0;
+    let totalSalary = 0;
+    for(let p of orderedLineup){
+        var cell = row.insertCell(-1);
+        let name = p.name;
+        let team = p.team;
+        if(cell.cellIndex==0) {
+            p.proj = Number(p.proj) * 1.5;
+        }
+        
+        cell.innerHTML = name + "<br>" + team + "<br>" + Number(p.salary) + "<br>" + Number(p.proj).toFixed(1);
+        totalSalary += Number(p.salary);
+        totalProj += Number(p.proj);
+    }
+    row.insertCell(-1).innerHTML = totalSalary;
+    row.insertCell(-1).innerHTML = totalProj.toFixed(1);
+
+    // Update ShowdownLineupsBuilt to num rows -1
+    document.getElementById("FDShowdownLineupsBuilt").innerHTML = lineupTable.rows.length-1;
+
+    updateFDShowdownOwnership();
+}
+
 // Update ownership for showdown lineups
 function updateShowdownOwnership(){
     var table = document.getElementById("showdownLineupTable");
@@ -1921,6 +2123,47 @@ function updateShowdownOwnership(){
     sortTable("showdownOwnership", 3);
 }
 
+// Update ownership for showdown lineups
+function updateFDShowdownOwnership(){
+    var table = document.getElementById("FDShowdownLineupTable");
+    var rows = table.rows;
+    
+    var players ={};
+    for(let r of rows){
+        if(r.rowIndex == 0) continue;
+        for(let i = 1; i < 5; i++){
+            let name = r.cells[i].innerHTML.split("<br>")[0];
+            if(!Object.keys(players).includes(name)) {
+                // Create object with key 'name' and values 'flex' and 'mvp'
+                players[name] = {"flex":1, "mvp": 0};
+            } else{
+                players[name]["flex"]++;
+            }
+        }
+        let mvp = r.cells[0].innerHTML.split("<br>")[0];
+        if(!Object.keys(players).includes(mvp)){
+            // Create object with key 'name' and values 'flex' and 'mvp'
+            players[mvp] = {"flex": 0, "mvp": 1};            
+        } else{
+            players[mvp]["mvp"]++;
+        }
+    }
+    var ownershipTable = document.getElementById("FDShowdownOwnership");
+    while(ownershipTable.rows.length > 1){
+        ownershipTable.deleteRow(-1);
+    }
+    for(let p of Object.keys(players)){
+        if(players[p].flex > 0 || players[p].mvp > 0){
+            var row = ownershipTable.insertRow(-1);
+            row.insertCell(-1).innerHTML = p;
+            row.insertCell(-1).innerHTML = (players[p].mvp/(table.rows.length-1)*100).toFixed(1);
+            row.insertCell(-1).innerHTML = (players[p].flex/(table.rows.length-1)*100).toFixed(1);
+            row.insertCell(-1).innerHTML = ((players[p].mvp+players[p].flex)/(table.rows.length-1)*100).toFixed(1);
+        }
+    }
+    sortTable("FDShowdownOwnership", 3);
+}
+
 // Add variance to lineup builder based on slider value
 function updateSlider(){
     var slider = document.getElementById("varianceSlider");
@@ -1945,10 +2188,29 @@ function updateOtherSelect(){
     }
     if(rows[i].cells[2].innerHTML == "CPT" || rows[i].cells[2].innerHTML == "FLEX") {
         pickBuilder('Showdown');
+    }else if(checkForFanduel(otherSelect)){
+        pickBuilder('FDShowdown');
     }else{
         pickBuilder('Classic');
     }
 }
+
+
+
+// Check if contest is a FanDuel contest
+function checkForFanduel(contest){
+    var rows = document.getElementById("contestDataTable").rows;
+    var teams = [];
+    for(let i of rows){
+        if(i.cells[8].innerHTML == contest){
+            if(i.cells[2].innerHTML == "CPT" || i.cells[2].innerHTML == "FLEX") return false;
+            if(!teams.includes(i.cells[3].innerHTML)) teams.push(i.cells[3].innerHTML);
+            if(teams.length > 2) return false;
+        }
+    }
+    return true;
+}
+    
 
 // Get player medians from storage, if it exists
 function getPlayerMedians(){
@@ -2017,6 +2279,8 @@ function getPlayerMedians(){
             var teamMedians = getInfoFromJSON('teamMedians.json')[teamAbbrevToName(team)];
             if(name in playerMedians){
                 p.cells[7].innerHTML = (playerMedians[name]["Passing Yards"]*0.04/100*Number(teamMedians["Passing Yards"]) + playerMedians[name]["Passing TDs"]*4/100*Number(teamMedians["Passing TDs"]) - playerMedians[name]["Interceptions"]*1/100*Number(teamMedians["Interceptions"]) + playerMedians[name]["Rushing Yards"]*0.1/100*Number(teamMedians["Rushing Yards"]) + playerMedians[name]["Rushing TDs"]*6/100*Number(teamMedians["Rushing TDs"]) + playerMedians[name]["Receptions"]*1/100*Number(teamMedians["Receptions"]) + playerMedians[name]["Receiving Yards"]*0.1/100*Number(teamMedians["Receiving Yards"]) + playerMedians[name]["Receiving TDs"]*6/100*Number(teamMedians["Receiving TDs"])).toFixed(1);
+                if(p.cells[6].innerHTML.includes("-")) p.cells[7].innerHTML -= playerMedians[name]["Receptions"]*1/100*Number(teamMedians["Receptions"]);
+
             }else if(name in kickers){
                 p.cells[7].innerHTML = kickers[name]["FPS"];
             }else if(name in dsts) {
@@ -2070,6 +2334,8 @@ function teamAbbrevToName(team){
         case "IND":
             return "Indianapolis Colts";
         case "JAX":
+            return "Jacksonville Jaguars";
+        case "JAC":
             return "Jacksonville Jaguars";
         case "KC":
             return "Kansas City Chiefs";
@@ -2362,8 +2628,8 @@ function updateProjectionsFromMedians(){
             var playerProjections = playerMedians[player];
             var teamProjections = teamMedians[team];
             var newProjections = {};
+            console.log(player);
             for(let c of categories){
-                
                 if(playerProjections[c] == undefined || teamProjections[c] == undefined){
                     newProjections[c] = 0;
                 } else{
@@ -2427,37 +2693,61 @@ function handleTXT(name){
 
 // Download lineups from builder as CSV 
 function downloadLineupsShowdown(){
-    var lineups = document.getElementById("showdownLineupTable").rows;
-    var csv = "data:text/csv;charset=utf-8,";
-    csv += "CPT,FLEX,FLEX,FLEX,FLEX,FLEX\n";
-    for(let l of lineups){
-        if(l.rowIndex == 0) continue;
-        var row = [];
-        for(let c of l.cells){
-            if(c.cellIndex > 5) continue;
-            var cell = c.innerHTML;
-            var position = "FLEX";
-            if(c.cellIndex == 0){
-                position = "CPT";
+    if(document.querySelector("#FDShowdownLineupTable > thead > tr:nth-child(1) > th:nth-child(1)").innerHTML == "CPT"){
+        var lineups = document.getElementById("showdownLineupTable").rows;
+        var csv = "data:text/csv;charset=utf-8,";
+        csv += "CPT,FLEX,FLEX,FLEX,FLEX,FLEX\n";
+        for(let l of lineups){
+            if(l.rowIndex == 0) continue;
+            var row = [];
+            for(let c of l.cells){
+                if(c.cellIndex > 5) continue;
+                var cell = c.innerHTML;
+                var position = "FLEX";
+                if(c.cellIndex == 0){
+                    position = "CPT";
+                }
+                var name = cell.split("<br>")[0].replace("CPT ", "").trim();
+                row.push(getIdFromUpload(name, position));
             }
-            var name = cell.split("<br>")[0].replace("CPT ", "").trim();
-            row.push(getIdFromUpload(name, position));
+            csv += row.join(",") + "\n";
         }
-        csv += row.join(",") + "\n";
+        var encodedUri = encodeURI(csv);
+        var link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "lineups.csv");
+        document.body.appendChild(link);
+        link.click();
+    }else{
+        var lineups = document.getElementById("FDShowdownLineupTable").rows;
+        var csv = "data:text/csv;charset=utf-8,";
+        csv += "MVP - 1.5X Points,AnyFLEX,AnyFLEX,AnyFLEX,AnyFLEX\n";
+        for(let l of lineups){
+            if(l.rowIndex == 0) continue;
+            var row = [];
+            for(let c of l.cells){
+                if(c.cellIndex > 4) continue;
+                var cell = c.innerHTML;
+                var position = "FD";
+                var name = cell.split("<br>")[0].trim();
+                row.push(getIdFromUpload(name, position));
+            }
+            csv += row.join(",") + "\n";
+        }
+        var encodedUri = encodeURI(csv);
+        var link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "lineups.csv");
+        document.body.appendChild(link);
+        link.click();
     }
-    var encodedUri = encodeURI(csv);
-    var link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "lineups.csv");
-    document.body.appendChild(link);
-    link.click();
 }
 
 // Download lineups from builder as CSV
 function downloadLineups(){
     var lineups = document.getElementById("lineupTable").rows;
     var csv = "data:text/csv;charset=utf-8,";
-    csv += "QB,RB,RB,WR,WR,WR,TE,FLEX,DST\n";
+    if(document.getElementById('maxSalaryClassic').value > 50000) csv += "QB,RB,RB,WR,WR,WR,TE,FLEX,DEF\n"; else csv += "QB,RB,RB,WR,WR,WR,TE,FLEX,DST\n";
     for(let l of lineups){
         if(l.rowIndex == 0) continue;
         var row = [];
@@ -2498,7 +2788,7 @@ function getIdFromUpload(name, position){
     var found = false;
     var x = 0;
     while(!found){
-        if(rows[x].cells[1].innerHTML == name && (rows[x].cells[2].innerHTML == position || (position == "FLEX" && (rows[x].cells[2].innerHTML == "RB" || rows[x].cells[2].innerHTML == "WR" || rows[x].cells[2].innerHTML == "TE")))){
+        if(rows[x].cells[1].innerHTML == name && (position == "FD" || rows[x].cells[2].innerHTML == position || (position == "FLEX" && (rows[x].cells[2].innerHTML == "RB" || rows[x].cells[2].innerHTML == "WR" || rows[x].cells[2].innerHTML == "TE")))){
             found = true;
         }else{
             x++;
@@ -2538,41 +2828,77 @@ function handleLineupscsv(){
 }
 
 function downloadEditedLineupsShowdown(){
-    var lineups = document.getElementById("showdownLineupTable").rows;
-    var csv = "data:text/csv;charset=utf-8,";
-    var previousLineups = JSON.parse(DKEntries);
-    
-    for(let l of lineups){
-        if(l.rowIndex == 0) continue;
-        var row = [];
-        for(let c of l.cells){
-            if(c.cellIndex > 5) continue;
-            var cell = c.innerHTML;
-            var position = "FLEX";
-            if(c.cellIndex == 0){
-                position = "CPT";
+    if(document.querySelector("#FDShowdownLineupTable > thead > tr:nth-child(1) > th:nth-child(1)").innerHTML == "CPT"){
+
+        var lineups = document.getElementById("showdownLineupTable").rows;
+        var csv = "data:text/csv;charset=utf-8,";
+        var previousLineups = JSON.parse(DKEntries);
+        
+        for(let l of lineups){
+            if(l.rowIndex == 0) continue;
+            var row = [];
+            for(let c of l.cells){
+                if(c.cellIndex > 5) continue;
+                var cell = c.innerHTML;
+                var position = "FLEX";
+                if(c.cellIndex == 0){
+                    position = "CPT";
+                }
+                var name = cell.split("<br>")[0].replace("CPT ", "").trim();
+                row.push(getIdFromUpload(name, position));
             }
-            var name = cell.split("<br>")[0].replace("CPT ", "").trim();
-            row.push(getIdFromUpload(name, position));
-        }
-        var index = l.rowIndex;
-        if(index > previousLineups.length) index = previousLineups.length;
-        for(let i = 0; i < row.length; i++){
+            var index = l.rowIndex;
+            if(index > previousLineups.length) index = previousLineups.length;
+            for(let i = 0; i < row.length; i++){
 
-            previousLineups[index][i+4] = row[i];
+                previousLineups[index][i+4] = row[i];
+            }
         }
-    }
-    for(let l of previousLineups){
-        csv += l.join(",") + "\n";
-    }
-    //csv += previousLineups.join("\n");
-    var encodedUri = encodeURI(csv);
+        for(let l of previousLineups){
+            csv += l.join(",") + "\n";
+        }
+        //csv += previousLineups.join("\n");
+        var encodedUri = encodeURI(csv);
 
-    var link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "lineups.csv");
-    document.body.appendChild(link);
-    link.click();
+        var link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "lineups.csv");
+        document.body.appendChild(link);
+        link.click();
+    }else{
+        var lineups = document.getElementById("FDShowdownLineupTable").rows;
+        var csv = "data:text/csv;charset=utf-8,";
+        var previousLineups = JSON.parse(DKEntries);
+        
+        for(let l of lineups){
+            if(l.rowIndex == 0) continue;
+            var row = [];
+            for(let c of l.cells){
+                if(c.cellIndex > 4) continue;
+                var cell = c.innerHTML;
+                var position = "FD";
+                var name = cell.split("<br>")[0].replace("MVP ", "").trim();
+                row.push(getIdFromUpload(name, position));
+            }
+            var index = l.rowIndex;
+            if(index > previousLineups.length) index = previousLineups.length;
+            for(let i = 0; i < row.length; i++){
+
+                previousLineups[index][i+3] = row[i];
+            }
+        }
+        for(let l of previousLineups){
+            csv += l.join(",") + "\n";
+        }
+        //csv += previousLineups.join("\n");
+        var encodedUri = encodeURI(csv);
+
+        var link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "lineups.csv");
+        document.body.appendChild(link);
+        link.click();
+    }
 }
 
 function downloadEditedLineups(){
@@ -2588,7 +2914,7 @@ function downloadEditedLineups(){
             var cell = c.innerHTML;
             var position = "FLEX";
             if(c.cellIndex == 0){
-                position = "QB";
+                position = "QB";l
             }else if(c.cellIndex == 1 || c.cellIndex == 2){
                 position = "RB";
             }else if(c.cellIndex == 3 || c.cellIndex == 4 || c.cellIndex == 5){
@@ -2607,8 +2933,7 @@ function downloadEditedLineups(){
         var index = l.rowIndex;
         if(index > previousLineups.length) index = previousLineups.length;
         for(let i = 0; i < row.length; i++){
-
-            previousLineups[index][i+4] = row[i];
+            if(row[i].includes("-")) previousLineups[index][i+3] = row[i]; else previousLineups[index][i+4] = row[i];
         }
     }
     for(let l of previousLineups){
@@ -2749,7 +3074,7 @@ function setDefenseProjections(){
     
     var players = document.getElementById("contestDataTable").rows;
     for(let p of players){
-        if(p.cells[2].innerHTML == "DST" || p.cells[2].getAttribute("defense") == "true"){
+        if(p.cells[2].innerHTML == "D" || p.cells[2].innerHTML == "DST" || p.cells[2].getAttribute("defense") == "true"){
             p.cells[9].innerHTML = defenses[p.cells[3].innerHTML.trim()];
             if(p.cells[2].innerHTML == "CPT") p.cells[9].innerHTML =( Number(p.cells[9].innerHTML) * 1.5).toFixed(1);
         }
@@ -2802,7 +3127,7 @@ function adjustProjectionsByDefense(){
         let pointsAllowed = d.cells[6].innerHTML.trim();
         let yardsAllowed = d.cells[7].innerHTML.trim();
 
-        defenseEffect[defense] = {pointsAllowed: pointsAllowed, yardsAllowed: yardsAllowed};
+        defenseEffect[defense] = {'pointsAllowed': pointsAllowed, 'yardsAllowed': yardsAllowed};
     }
     for(let p of players){
         let defense = p.cells[4].innerHTML.trim();
@@ -2966,6 +3291,7 @@ function adjustProjectionsByInjuries(){
             }
         }
         if(found.length==0) continue;
+        console.log(players[found[0]].cells[9]);
         var playerProjections = JSON.parse(players[found[0]].cells[9].getAttribute("projections"));
         for(let r in players){
             var p = players[r];
@@ -3313,7 +3639,6 @@ function fillCashOrGpp(){
     if(localStorage.cashPlays) cashPlays = JSON.parse(localStorage.cashPlays);
     var gppPlays = [];
     if(localStorage.gppPlays) gppPlays = JSON.parse(localStorage.gppPlays);
-
     for(let n of names){
         var row = cogTable.insertRow(-1);
         var cell = row.insertCell(-1);
