@@ -61,6 +61,7 @@
                         </select></td>
                         <td><select id="teamSelect" onchange="getPositionProjections()"><option value="All teams">All teams</option></option></select></td>
                         <td><button id="clearTable" onclick="clearSaves()">Clear Table</button></td>
+                        <td><button id="resetProjections" onclick="resetProjections()">Reset Projections</button></td>
                     </table>
                 </div>
                 <div id="table">
@@ -122,49 +123,10 @@
                         </tr>
                         <tr>
                             <td>Projection:</td>
-                            <td id="playerProjection"></td>
+                            <td><input type="number" id="playerProjection" onchange="updatePlayerProjection(this)"></td>
                         </tr>
                     </table>
-                    <div>
-                        <table id="updateProjections" style="width:100%">
-                            <tr>
-                                <td>Passing Yards:</td>
-                                <td><input type="number" id="passingYards" value="0"></td>
-                            </tr>
-                            <tr>
-                                <td>Passing TDs:</td>
-                                <td><input type="number" id="passingTDs" value="0"></td>
-                            </tr>
-                            <tr>
-                                <td>Interceptions:</td>
-                                <td><input type="number" id="interceptions" value="0"></td>
-                            </tr>
-                            <tr>
-                                <td>Receptions:</td>
-                                <td><input type="number" id="receptions" value="0"></td>
-                            </tr>
-                            <tr>
-                                <td>Receiving Yards:</td>
-                                <td><input type="number" id="receivingYards" value="0"></td>
-                            </tr>
-                            <tr>
-                                <td>Receiving TDs:</td>
-                                <td><input type="number" id="receivingTDs" value="0"></td>
-                            </tr>
-                            <tr>
-                                <td>Rushing Yards:</td>
-                                <td><input type="number" id="rushingYards" value="0"></td>
-                            </tr>
-                            <tr>
-                                <td>Rushing TDs:</td>
-                                <td><input type="number" id="rushingTDs" value="0"></td>
-                            </tr>
-                            <tr>
-                                <td><button id="newProjection" onclick="newProjection()">Replace Projection</button></td>
-                                <td>New projection = <text id="calcProj">0</text></td>
-                            </tr>
-                        </table>
-                    </div>
+                    
                 </div>
             </div>
         </div>
@@ -235,7 +197,7 @@
                     <br><label for="gpp" style="width:150px">GPP</label><input type="radio"  name="cptRequire" id="gpp" value="gpp">
                     <br><label for="both" style="width:150px">Cash and GPP</label><input type="radio"  name="cptRequire" id="both" value="both" checked>
                 </div>
-                <br><text>Salary range: </text><input type="number" id="minSalaryShowdown" class="showdownBuilder" value="45000" min="0" max="49900" step="100"><input type="number" id="minSalaryClassic" class="classicBuilder" value="59000" min="0" max="49900" step="100">-<input type="number" id="maxSalaryClassic" value="60000" min="0" max="60000" step="100">
+                <br><text>Salary range: </text><input type="number" id="minSalaryShowdown" class="showdownBuilder" value="45000" min="0" max="60000" step="100"><input type="number" id="minSalaryClassic" class="classicBuilder" value="59000" min="0" max="49900" step="100">-<input type="number" id="maxSalaryClassic" value="60000" min="0" max="60000" step="100">
                 <br><text class="classicBuilder">Ownership range: </text><input class="classicBuilder" type="number" id="minOwnershipClassic" value="0" min="0"><text class="classicBuilder">-</text><input class="classicBuilder" type="number" id="maxOwnershipClassic" value="200" min="0">
                 <br>Max <input type="number" id="maxDarts" value="1" min="0"> below projection: <input type="number" id="minProjection" value="7" min="0">
                 <br>Group min: <input type="number" id="groupMin" value="3" min="0"> max: <input type="number" id="groupMax" value="5" min="0">

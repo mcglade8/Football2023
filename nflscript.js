@@ -106,7 +106,9 @@ function addTableRows(contestData, contestName, contestDate){
         if(!ids.includes(p['ID'])) {
             ids.push(p['ID'].trim());
             var row = table.insertRow(-1);
-            row.insertCell(0).innerHTML = (p['Game Info'].split(" ")[0] + " " + p['Game Info'].split(" ")[2]).trim();
+            if(p['Game Info'].split(" ")[2] == undefined) row.insertCell(0).innerHTML = (p['Game Info'].split(" ")[0] + " " + contestDate).trim(); else{
+                row.insertCell(0).innerHTML = (p['Game Info'].split(" ")[0] + " " + p['Game Info'].split(" ")[2]).trim();
+            }
             row.insertCell(1).innerHTML = p['Name'].trim();
             if(p['Roster Position'] == 'FLEX' || p['Roster Position'] == 'CPT') {
                 row.insertCell(2).innerHTML = p['Roster Position'].trim();
@@ -150,7 +152,7 @@ $(function() {
     getInjuryTable();
     getStealTable();
     getDefenseProjections();
-    updateProjectionsFromMedians();
+    //updateProjectionsFromMedians();
     adjustProjectionsByInjuries();
     adjustProjectionsByStolen();
     captainize();
@@ -159,11 +161,27 @@ $(function() {
     fillCashOrGpp();
     fillCashOrGppTeam();
     fillMatchupsTable();
-    applyMatchupAdjustments();
+    //applyMatchupAdjustments();
     getGroupsFromStorage();
     loadInputs(document.getElementById("builder"));
     loadInputs(document.getElementById("setPlayerMedians"));
 });
+
+function updatePlayerProjection(element){
+    var newProj = element.value;
+    var table = document.getElementById("contestDataTable");
+    var rows = table.rows;
+    var player = "";
+    for(let r of rows){
+        if(r.style.backgroundColor == "yellow"){
+            r.cells[9].innerHTML = newProj;
+            player = r.cells[1].innerHTML;
+        }
+    }
+    if(localStorage.manualProjections) var manualProjections = JSON.parse(localStorage.manualProjections); else var manualProjections = {};
+    manualProjections[player] = newProj;
+    localStorage.manualProjections = JSON.stringify(manualProjections);
+}
 
 // Add ownership projections for classic based on proj/salary (lm from R per position)
 function addOwnershipProjections(){
@@ -465,7 +483,7 @@ function fillPlayerData(){
             playerSummary.rows[5].cells[1].innerHTML = cells[6].innerHTML;
             playerSummary.rows[6].cells[1].innerHTML = cells[7].innerHTML;
             playerSummary.rows[7].cells[1].innerHTML = cells[8].innerHTML;
-            playerSummary.rows[8].cells[1].innerHTML = cells[9].innerHTML;
+            playerSummary.rows[8].cells[1].firstElementChild.value = cells[9].innerHTML;
 
             // Get defense data from defensesTable for opponent based on Abbr in cells[4]
             var defensesTable = document.getElementById("defensesTable");
@@ -478,7 +496,6 @@ function fillPlayerData(){
                     yardsEffect += r.cells[7].innerHTML;
                 }
             }
-            playerSummary.rows[3].cells[1].innerHTML += "<br>Scoring Allowed Compared to Average: " + Number(scoringEffect).toFixed(2) + "<br>Yards Allowed Compared to Average: " + Number(yardsEffect).toFixed(2);
 
             // Highlight row that was clicked
             colorTableRows();
@@ -490,12 +507,12 @@ function fillPlayerData(){
 }
 
 // Add event listeners to updateProjections table
-var inputs = document.getElementById("updateProjections").getElementsByTagName("input");
-for(let i of inputs){
-    i.addEventListener('input', function(){
-        updateProjections();
-    })
-}
+// var inputs = document.getElementById("updateProjections").getElementsByTagName("input");
+// for(let i of inputs){
+//     i.addEventListener('input', function(){
+//         updateProjections();
+//     })
+// }
 
 // Take input from updateProjections to change calcProj.innerHTML
 function updateProjections(){
@@ -1014,6 +1031,7 @@ function finishOwnership(){
 
 // Randomize projection
 function randomizeProjection(projection, position, rushtds, rectds, ptds){
+    var isFD = document.querySelector("#contestDataTable > tbody > tr:nth-child(2) > td:nth-child(7)").innerHTML.includes("-");
     var variance = Number(document.getElementById("varianceValue").innerHTML.trim());
     var thisProj = Number(projection);
     if(thisProj <= 0) return 0.5;
@@ -1048,8 +1066,13 @@ function randomizeProjection(projection, position, rushtds, rectds, ptds){
             }
             break;
         case "WR":
-            sd = thisProj * 0.6;
-            sd = Math.max(Math.min(thisProj, 10), 6.5);
+            if(isFD){
+                sd = thisProj*.4;
+                sd = Math.max(Math.min(thisProj, 6), 2);
+            }else{
+                sd = thisProj * 0.6;
+                sd = Math.max(Math.min(thisProj, 10), 6.5);
+            }
             tdTries = Math.ceil(rushtds*drives);
             tdChance = rushtds/tdTries;
             for(let i = 0; i < tdTries; i++){
@@ -1062,8 +1085,13 @@ function randomizeProjection(projection, position, rushtds, rectds, ptds){
             }
             break;
         case "TE":
-            sd = thisProj * 0.8;
-            sd = Math.min(thisProj, 10);
+            if(isFD){
+                sd = thisProj*.55;
+                sd = Math.min(thisProj, 5);
+            }else{
+                sd = thisProj * 0.8;
+                sd = Math.min(thisProj, 10);
+            }
             tdTries = Math.ceil(rushtds*drives);
             tdChance = rushtds/tdTries;
             for(let i = 0; i < tdTries; i++){
@@ -1076,10 +1104,10 @@ function randomizeProjection(projection, position, rushtds, rectds, ptds){
             }
             break;
         case "DST":
-            sd = 6;
+            sd = 7;
             break;
         case "K":
-            sd = 4;
+            sd = 5;
             break;
     }
 
@@ -1413,7 +1441,7 @@ function updateOwnership(){
 // Toggle elements based on contest type
 function pickBuilder(section){
    
-    
+    console.log(section);
     var classicBuilder = document.getElementsByClassName("classicBuilder"); 
     var showdownBuilder = document.getElementsByClassName("showdownBuilder");
     
@@ -1441,15 +1469,18 @@ function pickBuilder(section){
             document.getElementById("Showdown").style.display = "none";
             document.getElementById("minCash").value = 5;
             document.getElementById("minGpp").value = 0;
-            document.getElementById("groupMin").value = 0;
+            document.getElementById("groupMin").value = 2;
             document.getElementById("groupMax").value = 4;
+            document.getElementById('maxSalaryClassic').value = 58000;
+            document.getElementById('minSalaryShowdown').value = 54000;
 
         }else { 
-            document.getElementById("FDShowdown").style.display = "";
+            document.getElementById("FDShowdown").style.display = "none";
             document.getElementById("minCash").value = 6;
             document.getElementById("minGpp").value = 2;
             document.getElementById("groupMin").value = 3;
             document.getElementById("groupMax").value = 5;
+            document.getElementById('maxSalaryClassic').value = 50000;
         }
     }
 
@@ -1462,7 +1493,7 @@ function buildShowdownLineups(){
     if(contestTime == "All slates") alert("Please select a slate"); else{
         localStorage.notFeasible = 0;
         for(let i = 0; i < lineupsToBuild; i++){
-            if(document.querySelector("#FDShowdownLineupTable > thead > tr > th:nth-child(1)").innerHTML == "MVP") optimizeFDShowdown(generateProjections()); else optimizeShowdown(generateProjections());
+            if(document.getElementById("FDShowdown").style.display == "") optimizeFDShowdown(generateProjections()); else optimizeShowdown(generateProjections());
         }   
     }
 }
@@ -2172,9 +2203,10 @@ function updateSlider(){
 }
 
 // Causes slate change from "Builder" tab to update "Contest Info" tab
-function updateOtherSelect(){
+async function updateOtherSelect(){
     var otherSelect = document.getElementById("select2").value;
     document.getElementById("select").value = otherSelect;
+    var isFDShowdown = await checkForFanduel(otherSelect);
 
     var rows = document.getElementById("contestDataTable").rows;
     var i = 0;
@@ -2188,7 +2220,7 @@ function updateOtherSelect(){
     }
     if(rows[i].cells[2].innerHTML == "CPT" || rows[i].cells[2].innerHTML == "FLEX") {
         pickBuilder('Showdown');
-    }else if(checkForFanduel(otherSelect)){
+    }else if(isFDShowdown){
         pickBuilder('FDShowdown');
     }else{
         pickBuilder('Classic');
@@ -2198,32 +2230,33 @@ function updateOtherSelect(){
 
 
 // Check if contest is a FanDuel contest
-function checkForFanduel(contest){
-    var rows = document.getElementById("contestDataTable").rows;
-    var teams = [];
-    for(let i of rows){
-        if(i.cells[8].innerHTML == contest){
-            if(i.cells[2].innerHTML == "CPT" || i.cells[2].innerHTML == "FLEX") return false;
-            if(!teams.includes(i.cells[3].innerHTML)) teams.push(i.cells[3].innerHTML);
-            if(teams.length > 2) return false;
-        }
-    }
-    return true;
+async function checkForFanduel(contest){
+    let promise = new Promise(function(resolve) {
+            var rows = document.getElementById("contestDataTable").rows;
+            var teams = [];
+            for(let i of rows){
+                if(i.cells[8].innerHTML == contest){
+                    if(i.cells[2].innerHTML == "CPT" || i.cells[2].innerHTML == "FLEX") resolve(false);
+                    if(!teams.includes(i.cells[3].innerHTML)) teams.push(i.cells[3].innerHTML);
+                    
+                }
+            }
+            if(teams.length > 2) resolve(false); else resolve(true);
+        });
+    var result = await promise;
+    return result;
 }
     
 
 // Get player medians from storage, if it exists
 function getPlayerMedians(){
-    var table = document.getElementById("playerMediansTable");
     var players = document.getElementById("contestDataTable").rows;
-    var playerMedians = getInfoFromJSON('playerMedians.json');
-    var ths = table.getElementsByTagName("th");
+    var playerMedians = getInfoFromJSON('player_projections.json');
+    console.log(playerMedians);
     var teams = [];
     var list = [];
-    for(let p of players){
-        if(!teams.includes(p.cells[3].innerHTML.trim()) && p.cells[1].innerHTML != "Player"){
-            teams.push(p.cells[3].innerHTML.trim());
-        }
+    /*for(let p of players){
+        
         if(p.cells[1].innerHTML != "Player"){
             if(!list.includes(p.cells[1].innerHTML.trim())){
                 list.push(p.cells[1].innerHTML.trim());
@@ -2255,53 +2288,59 @@ function getPlayerMedians(){
             }
 
         }
+    }*/
+
+    var kickers = getInfoFromJSON('kickers.json');
+    var defenses = getInfoFromJSON('sacks.json');
+    var matchupAdjustments = JSON.parse(localStorage.matchupsTableData);
+    if(localStorage.manualProjections) var manualProjections = JSON.parse(localStorage.manualProjections); else var manualProjections = {};
+    // update PPG column in contestDataTable based on values in playerMedians
+    for(let p of players){
+        var matchupMultiplier = 1;
+        if(!teams.includes(p.cells[3].innerHTML.trim()) && p.cells[1].innerHTML != "Player"){
+            teams.push(p.cells[3].innerHTML.trim());
+        }
+        if(p.cells[1].innerHTML != "Name"){
+            var name = p.cells[1].innerHTML;
+            let team = p.cells[3].innerHTML;
+            let opp = p.cells[4].innerHTML;
+            if(opp == "LAR") opp = "LA";
+            if(team == "LAR") team = "LA";
+            if(name in manualProjections){
+                p.cells[9].innerHTML = manualProjections[name];
+            }else if(name in playerMedians){
+                if(team in matchupAdjustments){
+                    matchupMultiplier = 1 + matchupAdjustments[team]["slider"]/100;
+                }
+                p.cells[9].innerHTML = playerMedians[name];
+                if(p.cells[6].innerHTML.includes("-") && ["WR", "TE"].includes(p.cells[2].innerHTML)) p.cells[9].innerHTML = Number(p.cells[9].innerHTML) * 0.9 * matchupMultiplier;
+            }else if(name in kickers){
+                p.cells[7].innerHTML = kickers[name]["FPS"];
+                p.cells[9].innerHTML = kickers[name]["FPS"];
+            }else if(team in defenses && p.cells[2].innerHTML == "DST") {
+                if(opp in matchupAdjustments){
+                    matchupMultiplier = 1 - matchupAdjustments[opp]["slider"]/100;
+                }
+                p.cells[9].innerHTML = (2.7142 * defenses[team]["sacks_earned"] + 3.1666 * defenses[opp]["sacks_allowed"] - 5.6074) * matchupMultiplier;
+            }else{
+                p.cells[7].innerHTML = 0;
+                p.cells[9].innerHTML = 0;
+            }
+        }
     }
-    var teamSelect = document.getElementById("teamSelectMedians");
+    teams = teams.sort();
+    var teamSelect = document.getElementById("teamSelect");
     for(let t of teams){
         var option = document.createElement("option");
         option.text = t;
         teamSelect.add(option);
     }
-
-    var kickers = getInfoFromJSON('kickers.json');
-    var defenses = getInfoFromJSON('defenses.json');
-    var fullDSTs = Object.keys(defenses);
-    var dsts ={};
-    for(let d = 0; d <fullDSTs.length; d++){
-        var obj = fullDSTs[d].split(" ")[-1];
-        dsts[obj] = fullDSTs[d];
-    }
-    // update PPG column in contestDataTable based on values in playerMedians
-    for(let p of players){
-        if(p.cells[1].innerHTML != "Name"){
-            var name = p.cells[1].innerHTML;
-            var team = p.cells[3].innerHTML;
-            var teamMedians = getInfoFromJSON('teamMedians.json')[teamAbbrevToName(team)];
-            if(name in playerMedians){
-                p.cells[7].innerHTML = (playerMedians[name]["Passing Yards"]*0.04/100*Number(teamMedians["Passing Yards"]) + playerMedians[name]["Passing TDs"]*4/100*Number(teamMedians["Passing TDs"]) - playerMedians[name]["Interceptions"]*1/100*Number(teamMedians["Interceptions"]) + playerMedians[name]["Rushing Yards"]*0.1/100*Number(teamMedians["Rushing Yards"]) + playerMedians[name]["Rushing TDs"]*6/100*Number(teamMedians["Rushing TDs"]) + playerMedians[name]["Receptions"]*1/100*Number(teamMedians["Receptions"]) + playerMedians[name]["Receiving Yards"]*0.1/100*Number(teamMedians["Receiving Yards"]) + playerMedians[name]["Receiving TDs"]*6/100*Number(teamMedians["Receiving TDs"])).toFixed(1);
-                if(p.cells[6].innerHTML.includes("-")) p.cells[7].innerHTML -= playerMedians[name]["Receptions"]*1/100*Number(teamMedians["Receptions"]);
-
-            }else if(name in kickers){
-                p.cells[7].innerHTML = kickers[name]["FPS"];
-            }else if(name in dsts) {
-                var thisDST = defenses[dsts[name]];
-                var fpts = 0;
-                fpts += thisDST["Sacks"]*1.5;
-                fpts += thisDST["Interceptions"]*.7;
-                fpts += thisDST["Fumbles Recovered"]*1;
-                fpts += thisDST["Safeties"]*.2;
-                fpts += thisDST["Defensive TDs"]*.2;
-                fpts -= thisDST["Points Allowed"]*1.5;
-                fpts -= thisDST["Yards Allowed"]*.7;
-
-                p.cells[7].innerHTML = (6.5+fpts).toFixed(1);
-            }else{
-                p.cells[7].innerHTML = 0;
-            }
-        }
-    }
 }
 
+function resetProjections(){
+    localStorage.removeItem("manualProjections");
+    location.reload();
+}
 // Convert team abbrev to name
 function teamAbbrevToName(team){
     switch(team){
@@ -2375,74 +2414,16 @@ function teamAbbrevToName(team){
 }
 
 
-// Update player medians in storage
-function updatePlayerMedians(){
-    var table = document.getElementById("playerMediansTable");
-    var rows = table.rows;
-    var playerMedians = {};
-    for(let r of rows){
-        if(r.rowIndex == 0) continue;
-        var name = r.cells[1].innerHTML;
-        playerMedians[name] = {};
-        var ths = table.getElementsByTagName("th");
-        for(let t of ths){
-            if(["Game", "Name", "Position", "Team"].includes(t.innerHTML)) continue;
-            var slider = document.getElementById(name+t.innerHTML+"Slider");
-            playerMedians[name][t.innerHTML] = slider.value;
-        }
-    }
-    localStorage.playerMedians = JSON.stringify(playerMedians);
-    saveToFile(localStorage.playerMedians, "playerMedians.txt");
-}
-
 // Update feedback for slider input
 function updateProjectionSlider(id){
     var slider = document.getElementById(id);
+    if(slider == null) return;
     var label = slider.previousElementSibling;
     label.innerHTML = slider.value;
     populateSumOfLabels();
-    saveInputs(document.getElementById("playerMedians"));
 }
 
-function filterTeamsMedians(){
-    var table = document.getElementById("playerMediansTable");
-    var rows = table.rows;
-    var team = document.getElementById("teamSelectMedians").value;
-    for(let r of rows){
-        if(r.rowIndex == 0) continue;
-        if(r.cells[3].innerHTML.trim() == team || team == "All"){
-            r.style.display = "";
-        }else{
-            r.style.display = "none";
-        }
-    }
-    
-    populateSumOfLabels();
-}
 
-// Populate sum of labels in player medians table
-function populateSumOfLabels(){
-    var sumOfLabels = document.getElementById("sumOfLabels");
-    sumOfLabels.style.display = "";
-    var table = document.getElementById("playerMediansTable");
-    var rows = table.rows;
-    var sums = [0,0,0,0,0,0,0,0];
-    for(let r of rows){
-        if(r.rowIndex == 0) continue;
-        if(r.style.display != "none"){
-            var ths = table.getElementsByTagName("th");
-            for(let t of ths){
-                if(["Game", "Name", "Position", "Team"].includes(t.innerHTML)) continue;
-                var slider = document.getElementById(r.cells[1].innerHTML+t.innerHTML+"Slider");
-                sums[t.cellIndex-4] += Number(slider.value);
-            }
-        }
-    }
-    var solData = sumOfLabels.rows[1].cells;
-    for(let i = 0; i < sums.length; i++){
-        solData[i].innerHTML = sums[i];
-    }
-}
 // Get team medians
 function getTeamMedians(){
     var table = document.getElementById("teamMediansTable");
@@ -2628,7 +2609,7 @@ function updateProjectionsFromMedians(){
             var playerProjections = playerMedians[player];
             var teamProjections = teamMedians[team];
             var newProjections = {};
-            console.log(player);
+            //console.log(player);
             for(let c of categories){
                 if(playerProjections[c] == undefined || teamProjections[c] == undefined){
                     newProjections[c] = 0;
@@ -2636,8 +2617,11 @@ function updateProjectionsFromMedians(){
                     newProjections[c] = Number(playerProjections[c]) * Number(teamProjections[c])/100;
                 }
             }
-            r.cells[9].setAttribute("projections", JSON.stringify(newProjections));
-            r.cells[9].innerHTML = ((newProjections["Passing Yards"] * 0.04) + (newProjections["Passing TDs"] * 4) + (newProjections["Interceptions"] * -1) + (newProjections["Rushing Yards"] * 0.1) + (newProjections["Rushing TDs"] * 6) + (newProjections["Receptions"] * 1) + (newProjections["Receiving Yards"] * 0.1) + (newProjections["Receiving TDs"] * 6)).toFixed(1);
+
+           // r.cells[9].setAttribute("projections", JSON.stringify(newProjections));
+           // r.cells[9].innerHTML = ((newProjections["Passing Yards"] * 0.04) + (newProjections["Passing TDs"] * 4) + (newProjections["Interceptions"] * -1) + (newProjections["Rushing Yards"] * 0.1) + (newProjections["Rushing TDs"] * 6) + (newProjections["Receptions"] * 1) + (newProjections["Receiving Yards"] * 0.1) + (newProjections["Receiving TDs"] * 6)).toFixed(1);
+        }else{
+            console.log(player);
         }
     }
     adjustProjectionsByDefense();
@@ -2833,7 +2817,7 @@ function downloadEditedLineupsShowdown(){
         var lineups = document.getElementById("showdownLineupTable").rows;
         var csv = "data:text/csv;charset=utf-8,";
         var previousLineups = JSON.parse(DKEntries);
-        
+        console.log(previousLineups);
         for(let l of lineups){
             if(l.rowIndex == 0) continue;
             var row = [];
@@ -3226,116 +3210,43 @@ function adjustProjectionsByInjuries(){
     var players = document.getElementById("contestDataTable").rows;
     if(localStorage.injuries == undefined) return;
     var injuries = JSON.parse(localStorage.injuries);
-    var playerMedians = document.getElementById("playerMediansTable").rows;
 
     for(let i of injuries){
-        var medianProjections = {};
-        for(let m of playerMedians){
-            if(i.name.trim() == m.cells[1].innerHTML.trim()){
-                
-                var ths = document.getElementById("playerMediansTable").getElementsByTagName("th");
-                for(let t of ths){
-                    if(["Game", "Name", "Position", "Team"].includes(t.innerHTML)) continue;
-                    var slider = document.getElementById(m.cells[1].innerHTML.trim()+t.innerHTML+"Slider");
-                    medianProjections[t.innerHTML] = slider.value;
-                    
-                }
-            }
-        }
-        // find players with same name as injury
-        // want to rework this to incorporate "fixNames.json" for players whose names vary
-        // essentially, replace found with 
-        // var injured = players.filter(p => p.cells[1].innerHTML.trim() == i.name.trim());
-        // var b1 = players.filter(p => p.cells[1].innerHTML.trim() == i.b1.trim());
-        // var b2 = players.filter(p => p.cells[1].innerHTML.trim() == i.b2.trim());
-        // var b3 = players.filter(p => p.cells[1].innerHTML.trim() == i.b3.trim());
-        // var b4 = players.filter(p => p.cells[1].innerHTML.trim() == i.b4.trim());
-        // var b5 = players.filter(p => p.cells[1].innerHTML.trim() == i.b5.trim());
-        // if(injured.length == 0) continue;
-        // var allToAdjust = {};
-        // var injuredProjections = JSON.parse(injured[0].cells[9].getAttribute("projections"));
-        // allToAdjust["injuredProjections"] = injuredProjections;
-        // allToAdjust.injured = injured[0].cells[1].innerHTML;
-        // if(b1.length > 0){ 
-        //     allToAdjust["b1Projections"] = JSON.parse(b1[0].cells[9].getAttribute("projections"));
-        //     allToAdjust.b1 = b1[0].cells[1].innerHTML;
-        // }
-        // if(b2.length > 0){ 
-        //     allToAdjust["b2Projections"] = JSON.parse(b2[0].cells[9].getAttribute("projections"));
-        //     allToAdjust.b2 = b2[0].cells[1].innerHTML;
-        // }
-        // if(b3.length > 0){
-        //     allToAdjust["b3Projections"] = JSON.parse(b3[0].cells[9].getAttribute("projections"));
-        //     allToAdjust.b3 = b3[0].cells[1].innerHTML;
-        // }
-        // if(b4.length > 0){
-        //     allToAdjust["b4Projections"] = JSON.parse(b4[0].cells[9].getAttribute("projections"));
-        //     allToAdjust.b4 = b4[0].cells[1].innerHTML;
-        // }
-        // if(b5.length > 0){
-        //     allToAdjust["b5Projections"] = JSON.parse(b5[0].cells[9].getAttribute("projections"));
-        //     allToAdjust.b5 = b5[0].cells[1].innerHTML;
-        // }
-
-        // find an array in fixNames that contains injured, b1, b2, b3, b4, b5
-        // if found, allow function to iterate though array to find a match to go with name in playerMedians
-
-        var found = [];
+        var found = 0;
         var x = 0;
-        while(x < players.length){
+        while(x < players.length && found == 0){
             if(players[x].cells[1].innerHTML.trim() == i.name.trim()){
-                found.push(x);
-                x++;
+                found = x;
+                var playerProjections = players[found].cells[9].innerHTML;
+                players[found].cells[9].innerHTML = 0;
             }else{
                 x++;
             }
         }
-        if(found.length==0) continue;
-        console.log(players[found[0]].cells[9]);
-        var playerProjections = JSON.parse(players[found[0]].cells[9].getAttribute("projections"));
-        for(let r in players){
-            var p = players[r];
-            // continue if p is not a row
-            if(p.rowIndex == 0) continue;
-            // continue if p is not a tr element
-            if(p.tagName != "TR") continue;
-            console.log(p.cells[1].innerHTML.trim());
-            if(p.cells[1].innerHTML.trim() == i.b1.trim()){
-                var b1Projections = JSON.parse(p.cells[9].getAttribute("projections"));
-                var newProj = addInjuryBenefit(playerProjections, b1Projections, i.b1Pct);
-                p.cells[9].setAttribute("projections", JSON.stringify(newProj));
-                p.cells[9].innerHTML = ((newProj["Passing Yards"] * 0.04) + (newProj["Passing TDs"] * 4) + (newProj["Interceptions"] * -1) + (newProj["Rushing Yards"] * 0.1) + (newProj["Rushing TDs"] * 6) + (newProj["Receptions"] * 1) + (newProj["Receiving Yards"] * 0.1) + (newProj["Receiving TDs"] * 6)).toFixed(1);
-            }
-            if(p.cells[1].innerHTML.trim() == i.b2.trim()){
-                var b2Projections = JSON.parse(p.cells[9].getAttribute("projections"));
-                var newProj = addInjuryBenefit(playerProjections, b2Projections, i.b2Pct);
-                p.cells[9].setAttribute("projections", JSON.stringify(newProj));
-                p.cells[9].innerHTML = ((newProj["Passing Yards"] * 0.04) + (newProj["Passing TDs"] * 4) + (newProj["Interceptions"] * -1) + (newProj["Rushing Yards"] * 0.1) + (newProj["Rushing TDs"] * 6) + (newProj["Receptions"] * 1) + (newProj["Receiving Yards"] * 0.1) + (newProj["Receiving TDs"] * 6)).toFixed(1);
-            }
-            if(p.cells[1].innerHTML.trim() == i.b3.trim()){
-                var b3Projections = JSON.parse(p.cells[9].getAttribute("projections"));
-                var newProj = addInjuryBenefit(playerProjections, b3Projections, i.b3Pct);
-                p.cells[9].setAttribute("projections", JSON.stringify(newProj));
-                p.cells[9].innerHTML = ((newProj["Passing Yards"] * 0.04) + (newProj["Passing TDs"] * 4) + (newProj["Interceptions"] * -1) + (newProj["Rushing Yards"] * 0.1) + (newProj["Rushing TDs"] * 6) + (newProj["Receptions"] * 1) + (newProj["Receiving Yards"] * 0.1) + (newProj["Receiving TDs"] * 6)).toFixed(1);
-            }
-            if(p.cells[1].innerHTML.trim() == i.b4.trim()){
-                var b4Projections = JSON.parse(p.cells[9].getAttribute("projections"));
-                var newProj = addInjuryBenefit(playerProjections, b4Projections, i.b4Pct);
-                p.cells[9].setAttribute("projections", JSON.stringify(newProj));
-                p.cells[9].innerHTML = ((newProj["Passing Yards"] * 0.04) + (newProj["Passing TDs"] * 4) + (newProj["Interceptions"] * -1) + (newProj["Rushing Yards"] * 0.1) + (newProj["Rushing TDs"] * 6) + (newProj["Receptions"] * 1) + (newProj["Receiving Yards"] * 0.1) + (newProj["Receiving TDs"] * 6)).toFixed(1);
-            }
-            if(p.cells[1].innerHTML.trim() == i.b5.trim()){
-                var b5Projections = JSON.parse(p.cells[9].getAttribute("projections"));
-                var newProj = addInjuryBenefit(playerProjections, b5Projections, i.b5Pct);
-                p.cells[9].setAttribute("projections", JSON.stringify(newProj));
-                p.cells[9].innerHTML = ((newProj["Passing Yards"] * 0.04) + (newProj["Passing TDs"] * 4) + (newProj["Interceptions"] * -1) + (newProj["Rushing Yards"] * 0.1) + (newProj["Rushing TDs"] * 6) + (newProj["Receptions"] * 1) + (newProj["Receiving Yards"] * 0.1) + (newProj["Receiving TDs"] * 6)).toFixed(1);
+        for(p of players){
+            if(found==0) continue; else{
+                if(p.rowIndex == 0 || p.rowIndex==found) continue;
+                if(p.tagName != "TR") continue;
+                if(p.cells[1].innerHTML.trim() == i.b1.trim()){
+                    console.log(p.cells[1].innerHTML);
+                    p.cells[9].innerHTML = Number(p.cells[9].innerHTML) + Number(i.b1Pct)*Number(playerProjections)/100;
+                    }
+                if(p.cells[1].innerHTML.trim() == i.b2.trim()){
+                    p.cells[9].innerHTML = Number(p.cells[9].innerHTML) + Number(i.b2Pct)*Number(playerProjections)/100;
+                }
+                if(p.cells[1].innerHTML.trim() == i.b3.trim()){
+                    p.cells[9].innerHTML= Number(p.cells[9].innerHTML) + Number(i.b3Pct)*Number(playerProjections)/100;
+                }
+                if(p.cells[1].innerHTML.trim() == i.b4.trim()){
+                    p.cells[9].innerHTML = Number(p.cells[9].innerHTML) + Number(i.b4Pct)*Number(playerProjections)/100;
+                }
+                if(p.cells[1].innerHTML.trim() == i.b5.trim()){
+                    p.cells[9].innerHTML = Number(p.cells[9].innerHTML) +Number(i.b5Pct)*Number(playerProjections)/100;
+
+                }
             }
         }
-        for(let x of found){
-            players[x].cells[9].setAttribute("projections", "");
-            players[x].cells[9].innerHTML = 0;
-        }
-    }
+     }
 }
 
 // Add injury benefit to player projections
@@ -3504,80 +3415,48 @@ function adjustProjectionsByStolen(){
     var players = document.getElementById("contestDataTable").rows;
     if(localStorage.stolen == undefined) return;
     var stolen = JSON.parse(localStorage.stolen);
-    var playerMedians = document.getElementById("playerMediansTable").rows;
 
     for(let i of stolen){
-        var medianProjections = {};
-        for(let m of playerMedians){
-            if(i.name.trim() == m.cells[1].innerHTML.trim()){
-                
-                var ths = document.getElementById("playerMediansTable").getElementsByTagName("th");
-                for(let t of ths){
-                    if(["Game", "Name", "Position", "Team"].includes(t.innerHTML)) continue;
-                    var slider = document.getElementById(m.cells[1].innerHTML.trim()+t.innerHTML+"Slider");
-                    medianProjections[t.innerHTML] = slider.value;
-                }
-            }
-        }
-        var found = [];
+        var found = 0;
         var x = 0;
-        while(x < players.length){
+        while(x < players.length && found == 0){
             if(players[x].cells[1].innerHTML.trim() == i.name.trim()){
-                found.push(x);
-                x++;
+                found = x;
+                var playerProjections = players[found].cells[9].innerHTML;
+                players[found].cells[9].innerHTML = 0;
             }else{
                 x++;
             }
         }
         if(found.length==0) continue;
-        var playerProjections = JSON.parse(players[found[0]].cells[9].getAttribute("projections"));
-        for(let r in players){
-            var p = players[r];
+        for(p of players){
             // continue if p is not a row
             if(p.rowIndex == 0) continue;
             // continue if p is not a tr element
             if(p.tagName != "TR") continue;
+            if(found==0) continue; else{
+                var p = players[r];
+                if(p.rowIndex == 0 || p.rowIndex==found) continue;
+                if(p.tagName != "TR") continue;
+                if(p.cells[1].innerHTML.trim() == i.b1.trim()){
+                    console.log(p.cells[1].innerHTML);
+                    p.cells[9].innerHTML = Number(p.cells[9].innerHTML) + Number(i.b1Pct)*Number(playerProjections)/100;
+                }
+                if(p.cells[1].innerHTML.trim() == i.b2.trim()){
+                    p.cells[9].innerHTML = Number(p.cells[9].innerHTML) + Number(i.b2Pct)*Number(playerProjections)/100;
+                }           
+                if(p.cells[1].innerHTML.trim() == i.b3.trim()){
+                    p.cells[9].innerHTML= Number(p.cells[9].innerHTML) + Number(i.b3Pct)*Number(playerProjections)/100;
+                }
+                if(p.cells[1].innerHTML.trim() == i.b4.trim()){
+                    p.cells[9].innerHTML = Number(p.cells[9].innerHTML) + Number(i.b4Pct)*Number(playerProjections)/100;
+                }
+                if(p.cells[1].innerHTML.trim() == i.b5.trim()){
+                    p.cells[9].innerHTML = Number(p.cells[9].innerHTML) +Number(i.b5Pct)*Number(playerProjections)/100;
+    
+                }
+            }
 
-
-            if(p.cells[1].innerHTML.trim() == i.b1.trim()){
-                var b1Projections = JSON.parse(p.cells[9].getAttribute("projections"));
-                var newProj = addstealBenefit(b1Projections, i.b1Pct);
-                playerProjections = updateFromSteal(playerProjections, b1Projections, newProj);
-                p.cells[9].setAttribute("projections", JSON.stringify(newProj));
-                p.cells[9].innerHTML = ((newProj["Passing Yards"] * 0.04) + (newProj["Passing TDs"] * 4) + (newProj["Interceptions"] * -1) + (newProj["Rushing Yards"] * 0.1) + (newProj["Rushing TDs"] * 6) + (newProj["Receptions"] * 1) + (newProj["Receiving Yards"] * 0.1) + (newProj["Receiving TDs"] * 6)).toFixed(1);
-            }
-            if(p.cells[1].innerHTML.trim() == i.b2.trim()){
-                var b2Projections = JSON.parse(p.cells[9].getAttribute("projections"));
-                var newProj = addstealBenefit(b2Projections, i.b2Pct);
-                playerProjections = updateFromSteal(playerProjections, b2Projections, newProj);
-                p.cells[9].setAttribute("projections", JSON.stringify(newProj));
-                p.cells[9].innerHTML = ((newProj["Passing Yards"] * 0.04) + (newProj["Passing TDs"] * 4) + (newProj["Interceptions"] * -1) + (newProj["Rushing Yards"] * 0.1) + (newProj["Rushing TDs"] * 6) + (newProj["Receptions"] * 1) + (newProj["Receiving Yards"] * 0.1) + (newProj["Receiving TDs"] * 6)).toFixed(1);
-            }
-            if(p.cells[1].innerHTML.trim() == i.b3.trim()){
-                var b3Projections = JSON.parse(p.cells[9].getAttribute("projections"));
-                var newProj = addstealBenefit(b3Projections, i.b3Pct);
-                playerProjections = updateFromSteal(playerProjections, b3Projections, newProj);
-                p.cells[9].setAttribute("projections", JSON.stringify(newProj));
-                p.cells[9].innerHTML = ((newProj["Passing Yards"] * 0.04) + (newProj["Passing TDs"] * 4) + (newProj["Interceptions"] * -1) + (newProj["Rushing Yards"] * 0.1) + (newProj["Rushing TDs"] * 6) + (newProj["Receptions"] * 1) + (newProj["Receiving Yards"] * 0.1) + (newProj["Receiving TDs"] * 6)).toFixed(1);
-            }
-            if(p.cells[1].innerHTML.trim() == i.b4.trim()){
-                var b4Projections = JSON.parse(p.cells[9].getAttribute("projections"));
-                var newProj = addstealBenefit(b4Projections, i.b4Pct);
-                playerProjections = updateFromSteal(playerProjections, b4Projections, newProj);
-                p.cells[9].setAttribute("projections", JSON.stringify(newProj));
-                p.cells[9].innerHTML = ((newProj["Passing Yards"] * 0.04) + (newProj["Passing TDs"] * 4) + (newProj["Interceptions"] * -1) + (newProj["Rushing Yards"] * 0.1) + (newProj["Rushing TDs"] * 6) + (newProj["Receptions"] * 1) + (newProj["Receiving Yards"] * 0.1) + (newProj["Receiving TDs"] * 6)).toFixed(1);
-            }
-            if(p.cells[1].innerHTML.trim() == i.b5.trim()){
-                var b5Projections = JSON.parse(p.cells[9].getAttribute("projections"));
-                var newProj = addstealBenefit(b5Projections, i.b5Pct);
-                playerProjections = updateFromSteal(playerProjections, b5Projections, newProj);
-                p.cells[9].setAttribute("projections", JSON.stringify(newProj));
-                p.cells[9].innerHTML = ((newProj["Passing Yards"] * 0.04) + (newProj["Passing TDs"] * 4) + (newProj["Interceptions"] * -1) + (newProj["Rushing Yards"] * 0.1) + (newProj["Rushing TDs"] * 6) + (newProj["Receptions"] * 1) + (newProj["Receiving Yards"] * 0.1) + (newProj["Receiving TDs"] * 6)).toFixed(1);
-            }
-        }
-        for(let x of found){
-            players[x].cells[9].setAttribute("projections", JSON.stringify(playerProjections));
-            players[x].cells[9].innerHTML = (playerProjections["Passing Yards"]*0.04 + playerProjections["Passing TDs"]*4 + playerProjections["Interceptions"]*-1 + playerProjections["Rushing Yards"]*0.1 + playerProjections["Rushing TDs"]*6 + playerProjections["Receptions"]*1 + playerProjections["Receiving Yards"]*0.1 + playerProjections["Receiving TDs"]*6).toFixed(1);
         }
     }
 }
@@ -3839,7 +3718,9 @@ function updateProjectionsByMatchup(slider){
 // Apply matchup adjustments to projections
 async function applyMatchupAdjustments(){
     let promise = new Promise(function(resolve) {
+        if(localStorage.matchupsTableData == undefined) resolve();
         var data = JSON.parse(localStorage.matchupsTableData);
+        console.log(data);
         var players = document.getElementById("contestDataTable").rows;
         for(let p of players){
             if(p.rowIndex == 0) continue;
@@ -3848,6 +3729,8 @@ async function applyMatchupAdjustments(){
                     p.cells[9].innerHTML = (p.cells[9].innerHTML * (100-Number(data[p.cells[4].innerHTML]["slider"]))/100).toFixed(1);
                 }
             }else{
+                console.log(p.cells[3].innerHTML);
+
                 if(!p.cells[3].innerHTML in data) continue; else{
                     p.cells[9].innerHTML = (p.cells[9].innerHTML * (100+Number(data[p.cells[3].innerHTML]["slider"]))/100).toFixed(1);
                 }
