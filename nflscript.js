@@ -161,7 +161,7 @@ $(function() {
     fillCashOrGpp();
     fillCashOrGppTeam();
     fillMatchupsTable();
-    //applyMatchupAdjustments();
+    applyMatchupAdjustments();
     getGroupsFromStorage();
     loadInputs(document.getElementById("builder"));
     loadInputs(document.getElementById("setPlayerMedians"));
@@ -367,15 +367,14 @@ function saveTableData(){
         var rowData = {};
         var firstRow = rows[0];
         for (var j = 0; j < row.cells.length; j++) {
-            let info = firstRow.cells[j].innerHTML;
-            rowData[info] = row.cells[j].innerHTML;
-            let proj = row.cells[j].getAttribute("projections");
-            if(proj != null && proj != undefined && proj != ""){
-                rowData["projections"] = proj;
-            } else {
-                rowData["projections"] = "0";
-            }
-            
+            if(j == 1){
+                // remove periods, commas, and apostrophes from player names; remove Jr., Sr., II, III, and IV
+                let name = fixName(row.cells[j].innerHTML);
+                rowData["Name"] = name;
+            }else{
+                let info = firstRow.cells[j].innerHTML;
+                rowData[info] = row.cells[j].innerHTML;
+            }    
         }
         let dst = row.cells[2].getAttribute("defense");
         if(dst != null && dst != undefined && dst != ""){
@@ -390,6 +389,11 @@ function saveTableData(){
 
     }
     localStorage.setItem("tableData", JSON.stringify(tableData));
+}
+
+// fix names when saving to table
+function fixName(name){
+    return name.replaceAll(".", "").replace(",", "").replace("'", "").replace("Jr", "").replace("Sr", "").replace("II", "").replace("III", "").replace("IV", "").trim();
 }
 
 // Clear old data from contestDataTable
