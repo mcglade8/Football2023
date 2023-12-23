@@ -1861,7 +1861,6 @@ async function optimizeFDShowdown(players){
         } else {
             let promise = new Promise(function(resolve) {
                 var thisLineup = [];
-                console.log(results);
                 for(let k of Object.keys(results)){
                     if(k != "feasible" && k != "result" && k != "bounded" && k != "iterations" && k != "time" && k != "dual" && k != "primal" && k != "isIntegral"){
                         thisLineup.push(k);
@@ -2256,7 +2255,6 @@ async function checkForFanduel(contest){
 function getPlayerMedians(){
     var players = document.getElementById("contestDataTable").rows;
     var playerMedians = getInfoFromJSON('player_projections.json');
-    console.log(playerMedians);
     var teams = [];
     var list = [];
     /*for(let p of players){
@@ -2624,8 +2622,6 @@ function updateProjectionsFromMedians(){
 
            // r.cells[9].setAttribute("projections", JSON.stringify(newProjections));
            // r.cells[9].innerHTML = ((newProjections["Passing Yards"] * 0.04) + (newProjections["Passing TDs"] * 4) + (newProjections["Interceptions"] * -1) + (newProjections["Rushing Yards"] * 0.1) + (newProjections["Rushing TDs"] * 6) + (newProjections["Receptions"] * 1) + (newProjections["Receiving Yards"] * 0.1) + (newProjections["Receiving TDs"] * 6)).toFixed(1);
-        }else{
-            console.log(player);
         }
     }
     adjustProjectionsByDefense();
@@ -2821,7 +2817,7 @@ function downloadEditedLineupsShowdown(){
         var lineups = document.getElementById("showdownLineupTable").rows;
         var csv = "data:text/csv;charset=utf-8,";
         var previousLineups = JSON.parse(DKEntries);
-        console.log(previousLineups);
+
         for(let l of lineups){
             if(l.rowIndex == 0) continue;
             var row = [];
@@ -3232,7 +3228,6 @@ function adjustProjectionsByInjuries(){
                 if(p.rowIndex == 0 || p.rowIndex==found) continue;
                 if(p.tagName != "TR") continue;
                 if(p.cells[1].innerHTML.trim() == i.b1.trim()){
-                    console.log(p.cells[1].innerHTML);
                     p.cells[9].innerHTML = Number(p.cells[9].innerHTML) + Number(i.b1Pct)*Number(playerProjections)/100;
                     }
                 if(p.cells[1].innerHTML.trim() == i.b2.trim()){
@@ -3443,7 +3438,6 @@ function adjustProjectionsByStolen(){
                 if(p.rowIndex == 0 || p.rowIndex==found) continue;
                 if(p.tagName != "TR") continue;
                 if(p.cells[1].innerHTML.trim() == i.b1.trim()){
-                    console.log(p.cells[1].innerHTML);
                     p.cells[9].innerHTML = Number(p.cells[9].innerHTML) + Number(i.b1Pct)*Number(playerProjections)/100;
                 }
                 if(p.cells[1].innerHTML.trim() == i.b2.trim()){
@@ -3724,7 +3718,6 @@ async function applyMatchupAdjustments(){
     let promise = new Promise(function(resolve) {
         if(localStorage.matchupsTableData == undefined) resolve();
         var data = JSON.parse(localStorage.matchupsTableData);
-        console.log(data);
         var players = document.getElementById("contestDataTable").rows;
         for(let p of players){
             if(p.rowIndex == 0) continue;
@@ -3733,7 +3726,6 @@ async function applyMatchupAdjustments(){
                     p.cells[9].innerHTML = (p.cells[9].innerHTML * (100-Number(data[p.cells[4].innerHTML]["slider"]))/100).toFixed(1);
                 }
             }else{
-                console.log(p.cells[3].innerHTML);
 
                 if(!p.cells[3].innerHTML in data) continue; else{
                     p.cells[9].innerHTML = (p.cells[9].innerHTML * (100+Number(data[p.cells[3].innerHTML]["slider"]))/100).toFixed(1);
