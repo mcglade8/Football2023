@@ -2677,7 +2677,7 @@ function handleTXT(name){
 
 // Download lineups from builder as CSV 
 function downloadLineupsShowdown(){
-    if(document.querySelector("#FDShowdownLineupTable > thead > tr:nth-child(1) > th:nth-child(1)").innerHTML == "CPT"){
+    if(document.querySelector("#FDShowdown").style.display == "none"){
         var lineups = document.getElementById("showdownLineupTable").rows;
         var csv = "data:text/csv;charset=utf-8,";
         csv += "CPT,FLEX,FLEX,FLEX,FLEX,FLEX\n";
@@ -3214,11 +3214,17 @@ function adjustProjectionsByInjuries(){
     for(let i of injuries){
         var found = 0;
         var x = 0;
-        while(x < players.length && found == 0){
+        while(x < players.length){
             if(players[x].cells[1].innerHTML.trim() == i.name.trim()){
-                found = x;
-                var playerProjections = players[found].cells[9].innerHTML;
-                players[found].cells[9].innerHTML = 0;
+                if(players[x].cells[2].innerHTML.trim() == "CPT") {
+                    players[x].cells[9].innerHTML = 0;
+                    x++;
+                } else{
+                    found = x;
+                    var playerProjections = players[found].cells[9].innerHTML;
+                    players[found].cells[9].innerHTML = 0;
+                    x++;
+                }
             }else{
                 x++;
             }
