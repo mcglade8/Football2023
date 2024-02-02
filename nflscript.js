@@ -125,7 +125,7 @@ function addTableRows(contestData, contestName, contestDate){
                 if(p['Position'] == 'WR') row.cells[2].setAttribute("pos", "wr");
                 if(p['Position'] == 'TE') row.cells[2].setAttribute("pos", "te");
 
-            } else row.insertCell(2).innerHTML = p['Position'].replace("D", "DST").trim();
+            } else row.insertCell(2).innerHTML = p['Position'].replace("D", "DST").replace("DSTST", "DST").trim();
             row.insertCell(3).innerHTML = p['TeamAbbrev'].trim();
             row.insertCell(4).innerHTML = p['Game Info'].replace("JAC", "JAX").split(" ")[0].replace("@" , "").replace(p['TeamAbbrev'], "").trim();
             row.insertCell(5).innerHTML = p['Salary'].trim();
