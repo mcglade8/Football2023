@@ -2294,7 +2294,7 @@ function getPlayerMedians(){
 
     var kickers = getInfoFromJSON('kickers.json');
     var defenses = getInfoFromJSON('sacks.json');
-    var matchupAdjustments = JSON.parse(localStorage.matchupsTableData);
+    var matchupAdjustments = localStorage.matchupsTableData ? JSON.parse(localStorage.matchupsTableData) : {};
     if(localStorage.manualProjections) var manualProjections = JSON.parse(localStorage.manualProjections); else var manualProjections = {};
     // update PPG column in contestDataTable based on values in playerMedians
     for(let p of players){
